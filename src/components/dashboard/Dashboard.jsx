@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
-import { CheckCircle, Clock, Calendar, CheckCircle2, X } from 'lucide-react';
+import { CheckCircle, Clock, ListTodo, CheckCircle2, X } from 'lucide-react';
 import databaseData from '../../data/database.json';
 
 const QuickStats = ({ stats }) => {
@@ -21,18 +21,18 @@ const QuickStats = ({ stats }) => {
           <div className="p-3 bg-amber-500/10 rounded-xl mb-2">
             <Clock className="h-6 w-6 text-amber-500" />
           </div>
-          <p className="text-slate-400 text-sm mb-1">Pending Tasks</p>
-          <h3 className="text-3xl font-bold text-white">{stats.pendingTasks}</h3>
+          <p className="text-slate-400 text-sm mb-1">Pending Today</p>
+          <h3 className="text-3xl font-bold text-white">{stats.pendingToday}</h3>
         </div>
       </div>
 
       <div className="flex-1 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 text-center">
         <div className="flex flex-col items-center">
           <div className="p-3 bg-blue-500/10 rounded-xl mb-2">
-            <Calendar className="h-6 w-6 text-blue-500" />
+            <ListTodo className="h-6 w-6 text-blue-500" />
           </div>
-          <p className="text-slate-400 text-sm mb-1">Next Due</p>
-          <h3 className="text-3xl font-bold text-white">{stats.nextDue}</h3>
+          <p className="text-slate-400 text-sm mb-1">Total Today</p>
+          <h3 className="text-3xl font-bold text-white">{stats.totalToday}</h3>
         </div>
       </div>
     </div>
@@ -42,8 +42,8 @@ const QuickStats = ({ stats }) => {
 QuickStats.propTypes = {
   stats: PropTypes.shape({
     completedToday: PropTypes.number.isRequired,
-    pendingTasks: PropTypes.number.isRequired,
-    nextDue: PropTypes.string.isRequired
+    pendingToday: PropTypes.number.isRequired,
+    totalToday: PropTypes.number.isRequired
   }).isRequired
 };
 
@@ -202,8 +202,8 @@ const Dashboard = () => {
   const [locations, setLocations] = useState([]);
   const [stats, setStats] = useState({
     completedToday: 0,
-    pendingTasks: 0,
-    nextDue: 'No upcoming tasks'
+    pendingToday: 0,
+    totalToday: 0
   });
 
   useEffect(() => {
@@ -211,24 +211,30 @@ const Dashboard = () => {
     setChores(userChores);
     setLocations(databaseData.locations);
 
-    const completed = userChores.filter(chore => chore.is_complete).length;
-    const pending = userChores.length - completed;
+    updateStats(userChores);
+  }, []);
+
+  const updateStats = (choreList) => {
+    const completed = choreList.filter(chore => chore.is_complete).length;
+    const total = choreList.length;
+    const pending = total - completed;
     
     setStats({
       completedToday: completed,
-      pendingTasks: pending,
-      nextDue: pending > 0 ? 'Today' : 'No upcoming tasks'
+      pendingToday: pending,
+      totalToday: total
     });
-  }, []);
+  };
 
   const handleToggleComplete = (choreId) => {
-    setChores(prevChores =>
-      prevChores.map(chore =>
-        chore.id === choreId
-          ? { ...chore, is_complete: !chore.is_complete }
-          : chore
-      )
+    const updatedChores = chores.map(chore =>
+      chore.id === choreId
+        ? { ...chore, is_complete: !chore.is_complete }
+        : chore
     );
+    
+    setChores(updatedChores);
+    updateStats(updatedChores);
   };
 
   return (

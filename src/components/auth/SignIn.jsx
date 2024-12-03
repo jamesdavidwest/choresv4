@@ -5,6 +5,7 @@ import { User, Lock } from 'lucide-react';
 import { Card } from '../ui/card';
 import { useAuth } from '../../context/AuthContext';
 import database from '../../data/database.json';
+import vacuumKidImage from '../../assets/vacuum_kid.png';
 
 const SignIn = () => {
   const navigate = useNavigate();
@@ -53,10 +54,18 @@ const SignIn = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="max-w-md w-full space-y-8 p-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="max-w-md w-full space-y-8 p-8 bg-gray-800 text-white">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4 text-white">ChoresApp</h1>
+          <div className="flex justify-center mb-6">
+            <img 
+              src={vacuumKidImage} 
+              alt="Child vacuuming" 
+              className="max-w-xs w-full h-auto rounded-lg shadow-md"
+            />
+          </div>
+          <h2 className="text-2xl font-semibold text-gray-300">
             Sign in to your account
           </h2>
         </div>
@@ -76,7 +85,7 @@ const SignIn = () => {
                   name="username"
                   type="text"
                   required
-                  className="appearance-none rounded-md relative block w-full px-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-md relative block w-full px-10 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                   placeholder="Username"
                   value={formData.username}
                   onChange={handleChange}
@@ -96,7 +105,7 @@ const SignIn = () => {
                   name="password"
                   type="password"
                   required
-                  className="appearance-none rounded-md relative block w-full px-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-md relative block w-full px-10 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                   placeholder="Password"
                   value={formData.password}
                   onChange={handleChange}
@@ -106,7 +115,7 @@ const SignIn = () => {
           </div>
 
           {error && (
-            <div className="text-red-500 text-sm text-center">
+            <div className="text-red-400 text-sm text-center">
               {error}
             </div>
           )}

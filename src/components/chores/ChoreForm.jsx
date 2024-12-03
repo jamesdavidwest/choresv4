@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import database from '../../data/database.json';
 
-// Placeholder for locations and users (to be replaced with actual data fetching)
-const LOCATIONS = ['Kitchen', 'Bathroom', 'Living Room', 'Bedroom', 'Garage'];
-const FREQUENCIES = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'];
+// Use actual data from database
+const LOCATIONS = database.locations.map(location => location.name);
+const FREQUENCIES = database.frequency_types.map(freq => freq.name.charAt(0).toUpperCase() + freq.name.slice(1));
+const USERS = database.users.filter(user => user.role !== 'SYSTEM').map(user => user.name);
 
 const ChoreForm = () => {
   const { id } = useParams();
@@ -25,12 +27,22 @@ const ChoreForm = () => {
     location: '',
     frequency: '',
     assignedUser: '',
-    description: ''
+    description: '',
+    specificYearlyDate: null
   });
 
   // Validation state
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Generate month options
+  const monthOptions = Array.from({length: 12}, (_, i) => ({
+    value: i,
+    label: new Date(0, i).toLocaleString('default', { month: 'long' })
+  }));
+
+  // Generate day options (1-31)
+  const dayOptions = Array.from({length: 31}, (_, i) => i + 1);
 
   // Load existing chore data in edit mode
   useEffect(() => {
@@ -60,6 +72,16 @@ const ChoreForm = () => {
     if (!formData.frequency) newErrors.frequency = 'Frequency is required';
     if (!formData.assignedUser) newErrors.assignedUser = 'Assigned user is required';
 
+    // Additional validation for yearly specific date
+    if (formData.frequency === 'Yearly' && formData.specificYearlyDate) {
+      if (formData.specificYearlyDate.month === undefined) {
+        newErrors.specificYearlyDate = 'Month is required for yearly chores';
+      }
+      if (formData.specificYearlyDate.day === undefined) {
+        newErrors.specificYearlyDate = 'Day is required for yearly chores';
+      }
+    }
+
     if (formData.description && formData.description.length > 500) {
       newErrors.description = 'Description must be 500 characters or less';
     }
@@ -74,6 +96,17 @@ const ChoreForm = () => {
     setFormData(prevData => ({
       ...prevData,
       [name]: value
+    }));
+  };
+
+  // Handle yearly date specific changes
+  const handleYearlyDateChange = (type, value) => {
+    setFormData(prevData => ({
+      ...prevData,
+      specificYearlyDate: {
+        ...prevData.specificYearlyDate,
+        [type]: parseInt(value, 10)
+      }
     }));
   };
 
@@ -207,9 +240,9 @@ const ChoreForm = () => {
             required
           >
             <option value="">Select User</option>
-            {/* TODO: Replace with actual users with USER role */}
-            <option value="user1">User 1</option>
-            <option value="user2">User 2</option>
+            {USERS.map(userName => (
+              <option key={userName} value={userName}>{userName}</option>
+            ))}
           </select>
           {errors.assignedUser && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.assignedUser}</p>}
         </div>
@@ -232,6 +265,46 @@ const ChoreForm = () => {
           />
           {errors.description && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.description}</p>}
         </div>
+
+        {/* Yearly Specific Date (if Yearly frequency is selected) */}
+        {formData.frequency === 'Yearly' && (
+          <div className="space-y-2">
+            <label className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
+              Specific Yearly Date (Optional)
+            </label>
+            <div className="flex space-x-4">
+              <select
+                value={formData.specificYearlyDate?.month ?? ''}
+                onChange={(e) => handleYearlyDateChange('month', e.target.value)}
+                className="w-1/2 px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
+              >
+                <option value="">Select Month</option>
+                {monthOptions.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={formData.specificYearlyDate?.day ?? ''}
+                onChange={(e) => handleYearlyDateChange('day', e.target.value)}
+                className="w-1/2 px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
+              >
+                <option value="">Select Day</option>
+                {dayOptions.map((day) => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {errors.specificYearlyDate && (
+              <p className="text-red-500 dark:text-red-400 mt-1 text-sm">
+                {errors.specificYearlyDate}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex space-x-4">

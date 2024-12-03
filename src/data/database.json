@@ -29,62 +29,6 @@
 			"name": "Sami",
 			"role": "USER",
 			"password": "Sami"
-		},
-		{
-			"id": 21,
-			"name": "Pick Up Trash",
-			"location_id": 7,
-			"frequency_id": 1,
-			"assigned_to": 4
-		},
-		{
-			"id": 22,
-			"name": "Vacuum Floors",
-			"location_id": 7,
-			"frequency_id": 1,
-			"assigned_to": 5
-		},
-		{
-			"id": 23,
-			"name": "Sweep Floors",
-			"location_id": 7,
-			"frequency_id": 1,
-			"assigned_to": 4
-		},
-		{
-			"id": 24,
-			"name": "Make Bed",
-			"location_id": 4,
-			"frequency_id": 1,
-			"assigned_to": 5
-		},
-		{
-			"id": 25,
-			"name": "Pick Up Dirty Clothes",
-			"location_id": 4,
-			"frequency_id": 1,
-			"assigned_to": 4
-		},
-		{
-			"id": 26,
-			"name": "Put Away Clean Clothes",
-			"location_id": 4,
-			"frequency_id": 1,
-			"assigned_to": 5
-		},
-		{
-			"id": 27,
-			"name": "Change Cat Litter",
-			"location_id": 7,
-			"frequency_id": 1,
-			"assigned_to": 4
-		},
-		{
-			"id": 28,
-			"name": "Check Mail",
-			"location_id": 8,
-			"frequency_id": 1,
-			"assigned_to": 5
 		}
 	],
 	"locations": [
@@ -282,6 +226,62 @@
 			"name": "Shampoo Carpets",
 			"location_id": 7,
 			"frequency_id": 5,
+			"assigned_to": 5
+		},
+		{
+			"id": 21,
+			"name": "Pick Up Trash",
+			"location_id": 7,
+			"frequency_id": 1,
+			"assigned_to": 4
+		},
+		{
+			"id": 22,
+			"name": "Vacuum Floors",
+			"location_id": 7,
+			"frequency_id": 1,
+			"assigned_to": 5
+		},
+		{
+			"id": 23,
+			"name": "Sweep Floors",
+			"location_id": 7,
+			"frequency_id": 1,
+			"assigned_to": 4
+		},
+		{
+			"id": 24,
+			"name": "Make Bed",
+			"location_id": 4,
+			"frequency_id": 1,
+			"assigned_to": 5
+		},
+		{
+			"id": 25,
+			"name": "Pick Up Dirty Clothes",
+			"location_id": 4,
+			"frequency_id": 1,
+			"assigned_to": 4
+		},
+		{
+			"id": 26,
+			"name": "Put Away Clean Clothes",
+			"location_id": 4,
+			"frequency_id": 1,
+			"assigned_to": 5
+		},
+		{
+			"id": 27,
+			"name": "Change Cat Litter",
+			"location_id": 7,
+			"frequency_id": 1,
+			"assigned_to": 4
+		},
+		{
+			"id": 28,
+			"name": "Check Mail",
+			"location_id": 8,
+			"frequency_id": 1,
 			"assigned_to": 5
 		}
 	]

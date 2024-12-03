@@ -2,7 +2,7 @@
 import { useAuth } from '../../context/AuthContext';
 import AdminChoresList from './AdminChoresList';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import database from '../../data/database.json';
 
 const ChoresManagement = () => {
@@ -63,6 +63,16 @@ const ChoresManagement = () => {
 
   return (
     <div className="container mx-auto p-6">
+      {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
+        <div className="mb-4 flex justify-end">
+          <Link 
+            to="/chores/new" 
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            New Chore
+          </Link>
+        </div>
+      )}
       <AdminChoresList
         chores={chores}
         locations={locations}
