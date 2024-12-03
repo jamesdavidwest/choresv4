@@ -1,6 +1,6 @@
 // src/components/layout/Toolbar.jsx
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, LogOut, Moon, Sun } from 'lucide-react';
+import { Home, LogOut, Moon, Sun, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
 
@@ -38,6 +38,8 @@ const Toolbar = () => {
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
+
+  const isAdminOrManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   return (
     <nav className="bg-white dark:bg-dark-900 shadow-sm dark:shadow-dark-md transition-colors duration-300">
@@ -82,6 +84,18 @@ const Toolbar = () => {
                 >
                   <Home className="h-5 w-5 text-gray-600 dark:text-dark-300" />
                 </Link>
+
+                {/* Admin/Manager Chores Management Link */}
+                {isAdminOrManager && (
+                  <Link 
+                    to="/chores" 
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-full transition-colors duration-200"
+                    title="Manage Chores"
+                  >
+                    <ClipboardList className="h-5 w-5 text-gray-600 dark:text-dark-300" />
+                  </Link>
+                )}
+
                 <button 
                   onClick={handleLogout}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-full transition-colors duration-200"
