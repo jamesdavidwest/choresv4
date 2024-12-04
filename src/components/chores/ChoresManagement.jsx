@@ -1,9 +1,10 @@
-// src/components/chores/ChoresManagement.jsx
-import { useAuth } from '../../context/AuthContext';
-import AdminChoresList from './AdminChoresList';
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import database from '../../data/database.json';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { chores as choresApi, auth } from '../../services/api';
+import AdminChoresList from './AdminChoresList';
+import { Alert, AlertDescription } from '../ui/alert';
+import { X } from 'lucide-react';
 
 const ChoresManagement = () => {
   const { user } = useAuth();
@@ -11,7 +12,9 @@ const ChoresManagement = () => {
   const [chores, setChores] = useState([]);
   const [locations, setLocations] = useState([]);
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     // Redirect if not admin/manager
@@ -20,65 +23,111 @@ const ChoresManagement = () => {
       return;
     }
 
-    try {
-      // Use imported database directly
-      const data = database;
-      
-      // Ensure we have the required data structures
-      if (!Array.isArray(data.chores) || !Array.isArray(data.locations) || !Array.isArray(data.users)) {
-        throw new Error('Invalid data structure');
-      }
-
-      setChores(data.chores || []);
-      setLocations(data.locations || []);
-      setUsers(data.users.filter(user => user.role === 'USER') || []);
-    } catch (error) {
-      console.error('Error in ChoresManagement:', error);
-      setError(error.message);
-    }
+    fetchData();
   }, [user, navigate]);
 
-  const handleDelete = (choreId) => {
-    setChores(prevChores => prevChores.filter(chore => chore.id !== choreId));
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Fetch chores
+      const fetchedChores = await choresApi.getAll();
+
+      // Fetch users (assuming auth service can get all users)
+      const fetchedUsers = await auth.getCurrentUser();
+
+      // Temporary locations (you might want to replace this with actual location fetching)
+      const fetchedLocations = [
+        { id: 1, name: 'Kitchen' },
+        { id: 2, name: 'Living Room' },
+        { id: 3, name: 'Bedroom' }
+      ];
+
+      setChores(fetchedChores);
+      setLocations(fetchedLocations);
+      
+      // Filter users if needed
+      setUsers(fetchedUsers.role === 'ADMIN' ? [] : [fetchedUsers]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError('Failed to load chores data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (error) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-          <strong className="font-bold">Error:</strong>
-          <span className="block sm:inline"> {error}</span>
-        </div>
-      </div>
-    );
-  }
+  const handleDelete = async (choreId) => {
+    try {
+      await choresApi.delete(choreId);
+      setChores(prevChores => prevChores.filter(chore => chore.id !== choreId));
+      setSuccessMessage('Chore deleted successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Error deleting chore:', error);
+      setError('Failed to delete chore. Please try again.');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
 
-  if (!chores.length && !error) {
+  const handleUpdateChore = async (choreId, updates) => {
+    try {
+      const updatedChore = await choresApi.update(choreId, updates);
+      setChores(prevChores =>
+        prevChores.map(chore =>
+          chore.id === choreId ? updatedChore : chore
+        )
+      );
+      setSuccessMessage('Chore updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Error updating chore:', error);
+      setError('Failed to update chore. Please try again.');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Loading chores...</div>
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 p-6">
+        <div className="max-w-6xl mx-auto text-white">
+          <p className="text-slate-400">Loading chores management...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-        <div className="mb-4 flex justify-end">
-          <Link 
-            to="/chores/new" 
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            New Chore
-          </Link>
-        </div>
-      )}
-      <AdminChoresList
-        chores={chores}
-        locations={locations}
-        users={users}
-        onDelete={handleDelete}
-      />
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 p-6">
+      <div className="max-w-6xl mx-auto">
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription className="flex items-center justify-between">
+              {error}
+              <button onClick={() => setError(null)} className="text-slate-400 hover:text-slate-300">
+                <X size={16} />
+              </button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {successMessage && (
+          <Alert className="mb-4 bg-green-500/10 text-green-500 border-green-500/20">
+            <AlertDescription className="flex items-center justify-between">
+              {successMessage}
+              <button onClick={() => setSuccessMessage('')} className="text-green-400 hover:text-green-300">
+                <X size={16} />
+              </button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <AdminChoresList
+          chores={chores}
+          locations={locations}
+          users={users}
+          onDelete={handleDelete}
+          onUpdateChore={handleUpdateChore}
+        />
+      </div>
     </div>
   );
 };

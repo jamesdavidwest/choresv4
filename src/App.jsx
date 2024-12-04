@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 import LandingPage from './pages/LandingPage';
@@ -21,17 +21,24 @@ const ProtectedRoutes = () => {
   );
 };
 
+// Create a component for the app's routes
+const AppRoutes = () => {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/*" element={<ProtectedRoutes />} />
+      </Routes>
+    </AuthProvider>
+  );
+};
+
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/*" element={<ProtectedRoutes />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <Router>
+      <AppRoutes />
+    </Router>
   );
 }
 

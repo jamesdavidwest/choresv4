@@ -1,75 +1,72 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import { Navigate, useLocation } from 'react-router-dom';
+import { auth } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const location = useLocation();
+  const navigate = useNavigate();
 
+  // Effect to check authentication status on mount
   useEffect(() => {
-    // Check for user in localStorage on initial load
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
-  }, []);
+    const initializeAuth = async () => {
+      try {
+        if (localStorage.getItem('token')) {
+          const userData = await auth.getCurrentUser();
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        auth.logout();
+        navigate('/signin', { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    initializeAuth();
+  }, [navigate]);
+
+  const login = async (credentials) => {
+    try {
+      const response = await auth.login(credentials);
+      if (response.user) {
+        setUser(response.user);
+        navigate('/dashboard', { replace: true });
+        return response.user;
+      }
+      throw new Error('Invalid response from server');
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
+    auth.logout();
     setUser(null);
-    localStorage.removeItem('user');
+    navigate('/signin', { replace: true });
   };
 
-  // Check if user is authenticated
-  const isAuthenticated = () => {
-    return !!user;
-  };
-
-  // RequireAuth component for protected routes
-  const RequireAuth = ({ children }) => {
-    if (loading) {
-      return <div>Loading...</div>;
-    }
-
-    if (!isAuthenticated()) {
-      // Redirect to signin page but save the attempted URL
-      return <Navigate to="/signin" state={{ from: location }} replace />;
-    }
-
-    return children;
-  };
-
-  // Add prop type validation for RequireAuth
-  RequireAuth.propTypes = {
-    children: PropTypes.node.isRequired
-  };
-
-  const value = {
-    user,
-    loading,
-    login,
-    logout,
-    isAuthenticated,
-    RequireAuth
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+      {children}
     </AuthContext.Provider>
   );
 };
 
-// Add prop type validation for AuthProvider
 AuthProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
@@ -81,5 +78,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-export default AuthContext;

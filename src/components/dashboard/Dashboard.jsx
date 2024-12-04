@@ -1,7 +1,10 @@
+// src/components/dashboard/Dashboard.jsx
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 import { CheckCircle, Clock, ListTodo, CheckCircle2, X } from 'lucide-react';
-import databaseData from '../../data/database.json';
+import { useApi } from '../../hooks/useApi';
+import { chores as choresApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const QuickStats = ({ stats }) => {
   return (
@@ -47,7 +50,7 @@ QuickStats.propTypes = {
   }).isRequired
 };
 
-const ChoresList = ({ chores, locations, onToggleComplete }) => {
+const ChoresList = ({ chores, locations, onToggleComplete, isLoading }) => {
   const [activeFrequency, setActiveFrequency] = useState('0');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   
@@ -83,6 +86,14 @@ const ChoresList = ({ chores, locations, onToggleComplete }) => {
       direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800/50">
@@ -194,11 +205,12 @@ ChoresList.propTypes = {
     id: PropTypes.number.isRequired,
     name: PropTypes.string.isRequired
   })).isRequired,
-  onToggleComplete: PropTypes.func.isRequired
+  onToggleComplete: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool.isRequired
 };
 
 const Dashboard = () => {
-  const [chores, setChores] = useState([]);
+  const { user } = useAuth();
   const [locations, setLocations] = useState([]);
   const [stats, setStats] = useState({
     completedToday: 0,
@@ -206,48 +218,78 @@ const Dashboard = () => {
     totalToday: 0
   });
 
+  const { 
+    data: chores, 
+    loading: isLoadingChores, 
+    error: choresError,
+    execute: fetchChores 
+  } = useApi(choresApi.getAll);
+
   useEffect(() => {
-    const userChores = databaseData.chores.filter(chore => chore.assigned_to === 4);
-    setChores(userChores);
-    setLocations(databaseData.locations);
+    const loadData = async () => {
+      try {
+        await fetchChores();
+        // Note: In a real app, you'd have a separate API endpoint for locations
+        // For now, we're using the same data structure as before
+        const response = await window.fs.readFile('Simple Database Schema.txt', { encoding: 'utf8' });
+        const data = JSON.parse(response);
+        setLocations(data.locations);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
 
-    updateStats(userChores);
-  }, []);
+    loadData();
+  }, [fetchChores]);
 
-  const updateStats = (choreList) => {
-    const completed = choreList.filter(chore => chore.is_complete).length;
-    const total = choreList.length;
-    const pending = total - completed;
-    
-    setStats({
-      completedToday: completed,
-      pendingToday: pending,
-      totalToday: total
-    });
+  useEffect(() => {
+    if (chores) {
+      const completed = chores.filter(chore => chore.is_complete).length;
+      const total = chores.length;
+      const pending = total - completed;
+      
+      setStats({
+        completedToday: completed,
+        pendingToday: pending,
+        totalToday: total
+      });
+    }
+  }, [chores]);
+
+  const handleToggleComplete = async (choreId) => {
+    try {
+      const chore = chores.find(c => c.id === choreId);
+      await choresApi.toggleComplete(choreId, !chore.is_complete);
+      await fetchChores(); // Refresh the list
+    } catch (error) {
+      console.error('Error toggling chore completion:', error);
+    }
   };
 
-  const handleToggleComplete = (choreId) => {
-    const updatedChores = chores.map(chore =>
-      chore.id === choreId
-        ? { ...chore, is_complete: !chore.is_complete }
-        : chore
+  if (choresError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center text-red-500">
+            Error loading chores: {choresError.message}
+          </div>
+        </div>
+      </div>
     );
-    
-    setChores(updatedChores);
-    updateStats(updatedChores);
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white p-6">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold mb-8 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-          My Dashboard
+          Welcome, {user?.name || 'User'}
         </h1>
         <QuickStats stats={stats} />
         <ChoresList 
-          chores={chores} 
-          locations={locations} 
-          onToggleComplete={handleToggleComplete} 
+          chores={chores || []}
+          locations={locations}
+          onToggleComplete={handleToggleComplete}
+          isLoading={isLoadingChores}
         />
       </div>
     </div>

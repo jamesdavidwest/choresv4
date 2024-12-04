@@ -1,14 +1,11 @@
 // src/components/auth/SignIn.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { User, Lock } from 'lucide-react';
 import { Card } from '../ui/card';
 import { useAuth } from '../../context/AuthContext';
-import database from '../../data/database.json';
 import vacuumKidImage from '../../assets/vacuum_kid.png';
 
 const SignIn = () => {
-  const navigate = useNavigate();
   const { login } = useAuth();
   
   const [formData, setFormData] = useState({
@@ -16,6 +13,7 @@ const SignIn = () => {
     password: ''
   });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,33 +21,23 @@ const SignIn = () => {
       ...prev,
       [name]: value
     }));
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (!formData.username || !formData.password) {
-      setError('Please fill in all fields');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      const users = database.users;
-      const user = users.find(u => 
-        u.name.toLowerCase() === formData.username.toLowerCase() &&
-        u.password === formData.password
-      );
-      
-      if (user) {
-        login(user);
-        navigate('/dashboard');
-      } else {
-        setError('Invalid username or password');
-      }
+      await login(formData);
+      // Navigation is handled in AuthContext after successful login
     } catch (err) {
-      setError('An error occurred during sign in');
-      console.error('Sign in error:', err);
+      console.error('Login error:', err);
+      setError(err.message || 'Invalid username or password');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -89,6 +77,7 @@ const SignIn = () => {
                   placeholder="Username"
                   value={formData.username}
                   onChange={handleChange}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -109,6 +98,7 @@ const SignIn = () => {
                   placeholder="Password"
                   value={formData.password}
                   onChange={handleChange}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -123,9 +113,12 @@ const SignIn = () => {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isLoading}
+              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Sign in
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
         </form>
