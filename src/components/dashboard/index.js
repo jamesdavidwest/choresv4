@@ -1,6 +1,5 @@
-
-// src/components/dashboard/index.js
 export { default as Dashboard } from './Dashboard';
-export { default as QuickStats } from './QuickStats';
-export { default as ChoresList } from './ChoresList';
-export { default as ChoreItem } from './ChoreItem';
+export { default as DashboardStats } from './DashboardStats';
+export { default as ChoresTable } from './ChoresTable';
+export { default as ChoresTableHeader } from './ChoresTableHeader';
+export { default as ChoresTableRow } from './ChoresTableRow';

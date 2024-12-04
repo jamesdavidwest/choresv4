@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircle, X, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Dropdown } from '../ui/dropdown';
-import { chores as choresApi } from '../../services/api';
+import { chores as choresApi, users as usersApi, locations as locationsApi } from '../../services/api';
 
 const FREQUENCIES = {
   0: 'All',
@@ -39,20 +39,18 @@ const AdminChoresList = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [fetchedChores, data] = await Promise.all([
+      const [fetchedChores, fetchedUsers, fetchedLocations] = await Promise.all([
         choresApi.getAll(),
-        window.fs.readFile('Simple Database Schema.txt', { encoding: 'utf8' })
-          .then(content => JSON.parse(content))
+        usersApi.getAll(),
+        locationsApi.getAll()
       ]);
 
-      // Prepare users and locations with "All" option
-      setUsers([{ id: 0, name: 'All Users' }, ...data.users]);
-      setLocations([{ id: 0, name: 'All Locations' }, ...data.locations]);
+      setUsers([{ id: 0, name: 'All Users' }, ...fetchedUsers]);
+      setLocations([{ id: 0, name: 'All Locations' }, ...fetchedLocations]);
 
-      // Enhance chores with location and user names
       const enhancedChores = fetchedChores.map(chore => {
-        const location = data.locations.find(loc => loc.id === chore.location_id);
-        const assignedUser = data.users.find(u => u.id === chore.assigned_to);
+        const location = fetchedLocations.find(loc => loc.id === chore.location_id);
+        const assignedUser = fetchedUsers.find(u => u.id === chore.assigned_to);
         
         return {
           ...chore,

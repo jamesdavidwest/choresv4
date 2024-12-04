@@ -1,6 +1,7 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ChoresProvider } from './context/ChoresContext';
 import MainLayout from './components/layout/MainLayout';
 import LandingPage from './pages/LandingPage';
 import SignIn from './components/auth/SignIn';
@@ -10,14 +11,16 @@ import { ChoresManagement, ChoreForm } from './components/chores';
 // Create a separate component for protected routes
 const ProtectedRoutes = () => {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/chores" element={<ChoresManagement />} />
-        <Route path="/chores/new" element={<ChoreForm />} />
-        <Route path="/chores/:id/edit" element={<ChoreForm />} />
-      </Route>
-    </Routes>
+    <ChoresProvider>
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/chores" element={<ChoresManagement />} />
+          <Route path="/chores/new" element={<ChoreForm />} />
+          <Route path="/chores/:id/edit" element={<ChoreForm />} />
+        </Route>
+      </Routes>
+    </ChoresProvider>
   );
 };
 

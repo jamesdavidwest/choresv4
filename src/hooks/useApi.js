@@ -1,8 +1,8 @@
 // src/hooks/useApi.js
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ApiError } from '../services/api';
 
-export const useApi = (apiFunc) => {
+export const useApi = (apiFunc, immediate = true) => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,12 @@ export const useApi = (apiFunc) => {
       setLoading(false);
     }
   }, [apiFunc]);
+
+  useEffect(() => {
+    if (immediate) {
+      execute();
+    }
+  }, [execute, immediate]);
 
   return {
     data,

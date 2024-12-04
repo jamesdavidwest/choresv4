@@ -1,7 +1,5 @@
-// src/services/api.js
-
 const API_URL = 'http://localhost:3001/api';
-const DEFAULT_TIMEOUT = 5000; // 5 seconds
+const DEFAULT_TIMEOUT = 15000;
 
 class ApiError extends Error {
   constructor(message, status, data) {
@@ -12,7 +10,6 @@ class ApiError extends Error {
   }
 }
 
-// Helper to handle fetch calls with timeout
 const fetchWithTimeout = (resource, options = {}) => {
   const { timeout = DEFAULT_TIMEOUT } = options;
   const controller = new AbortController();
@@ -38,16 +35,19 @@ const fetchWithAuth = async (endpoint, options = {}) => {
       headers,
     });
 
-    // Handle 401 Unauthorized
     if (response.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/signin';
       throw new ApiError('Session expired. Please login again.', 401);
     }
 
-    // Handle other non-200 responses
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { message: 'An unknown error occurred' };
+      }
       throw new ApiError(
         errorData.message || errorData.error || 'An error occurred',
         response.status,
@@ -55,15 +55,18 @@ const fetchWithAuth = async (endpoint, options = {}) => {
       );
     }
 
-    // Handle no content responses
     if (response.status === 204) {
       return null;
     }
 
-    return response.json();
+    try {
+      return await response.json();
+    } catch (e) {
+      throw new ApiError('Invalid response from server', 500);
+    }
   } catch (error) {
     if (error.name === 'AbortError') {
-      throw new ApiError('Request timeout', 408);
+      throw new ApiError('Request timeout - please try again', 408);
     }
     if (error instanceof ApiError) {
       throw error;
@@ -72,14 +75,12 @@ const fetchWithAuth = async (endpoint, options = {}) => {
   }
 };
 
-// Auth API calls
 export const auth = {
   login: async (credentials) => {
     if (!credentials.username || !credentials.password) {
       throw new ApiError('Username and password are required', 400);
     }
     
-    // We'll make this request without authentication
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
@@ -115,7 +116,18 @@ export const auth = {
   },
 };
 
-// Chores API calls
+export const users = {
+  getAll: () => fetchWithAuth('/users'),
+};
+
+export const locations = {
+  getAll: () => fetchWithAuth('/locations'),
+  getById: (id) => {
+    if (!id) throw new ApiError('Location ID is required', 400);
+    return fetchWithAuth(`/locations/${id}`);
+  }
+};
+
 export const chores = {
   getAll: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
@@ -154,16 +166,32 @@ export const chores = {
 
   toggleComplete: async (id, isComplete) => {
     if (!id) throw new ApiError('Chore ID is required', 400);
-    return fetchWithAuth(`/chores/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        is_complete: isComplete,
-        last_completed: isComplete ? new Date().toISOString() : null,
-      }),
-    });
+    
+    const maxRetries = 3;
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fetchWithAuth(`/chores/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            is_complete: isComplete,
+            last_completed: isComplete ? new Date().toISOString() : null,
+          }),
+        });
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+    
+    throw lastError;
   },
 
-  // Batch operations
   batchUpdate: (updates) => {
     if (!Array.isArray(updates) || !updates.length) {
       throw new ApiError('Updates array is required', 400);
@@ -175,5 +203,4 @@ export const chores = {
   },
 };
 
-// Export error class for use in components
 export { ApiError };

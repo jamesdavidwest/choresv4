@@ -1,10 +1,10 @@
-import { useAuth } from '../../context/AuthContext';
-import { useApi } from '../../hooks/useApi';
-import { locations as locationsApi } from '../../services/api';
-import { useChores } from '../../context/ChoresContext';
-import { useChoresStats } from '../../hooks/useChoresStats';
-import DashboardStats from './DashboardStats';
-import ChoresTable from './ChoresTable';
+import { useAuth } from '../context/AuthContext';
+import { useApi } from '../hooks/useApi';
+import { locations as locationsApi } from '../services/api';
+import { useChores } from '../context/ChoresContext';
+import { useChoresStats } from '../hooks/useChoresStats';
+import QuickStats from '../components/dashboard/QuickStats';
+import ChoresList from '../components/dashboard/ChoresList';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -30,9 +30,9 @@ const Dashboard = () => {
         <h1 className="text-4xl font-bold mb-8 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
           Welcome, {user?.name || 'User'}
         </h1>
-        <DashboardStats stats={stats} />
-        <ChoresTable 
-          chores={chores || []}
+        <QuickStats stats={stats} />
+        <ChoresList 
+          chores={chores}
           locations={locations || []}
           onToggleComplete={toggleChoreComplete}
           isLoading={isLoadingChores || isLoadingLocations}
