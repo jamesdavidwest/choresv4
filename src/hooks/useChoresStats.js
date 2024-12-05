@@ -1,27 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 
 export const useChoresStats = (chores) => {
-  const [stats, setStats] = useState({
-    completedToday: 0,
-    pendingToday: 0,
-    totalToday: 0
-  });
+  return useMemo(() => {
+    if (!chores) return {
+      totalChores: 0,
+      completedChores: 0,
+      pendingChores: 0
+    };
 
-  useEffect(() => {
-    if (chores) {
-      const completed = chores.filter(chore => chore.is_complete).length;
-      const total = chores.length;
-      const pending = total - completed;
-      
-      setStats({
-        completedToday: completed,
-        pendingToday: pending,
-        totalToday: total
-      });
-    }
+    const totalChores = chores.length;
+    const completedChores = chores.filter(chore => chore.is_complete).length;
+    const pendingChores = totalChores - completedChores;
+
+    return {
+      totalChores,
+      completedChores,
+      pendingChores
+    };
   }, [chores]);
-
-  return stats;
 };
-
-export default useChoresStats;

@@ -12,25 +12,40 @@ export const ChoresProvider = ({ children }) => {
   
   // Function to get personal chores (for Dashboard)
   const getPersonalChores = useCallback(async () => {
-    const allChores = await choresApi.getAll();
-    console.log('Current user:', user);
-    console.log('All chores before filtering:', allChores);
-    
-    const filteredChores = allChores.filter(chore => {
-      console.log(`Comparing chore assigned_to: ${chore.assigned_to} with user.id: ${user.id}`);
-      return chore.assigned_to === user.id;
-    });
-    
-    console.log('Filtered chores:', filteredChores);
-    return filteredChores;
+    if (!user) {
+      return [];
+    }
+    try {
+      const allChores = await choresApi.getAll();
+      console.log('All chores before filtering:', allChores);
+      
+      const filteredChores = allChores.filter(chore => {
+        return chore.assigned_to === user.id;
+      });
+      
+      console.log('Filtered chores:', filteredChores);
+      return filteredChores;
+    } catch (err) {
+      if (err.status === 401) {
+        return []; // Return empty array for unauthorized users
+      }
+      throw err;
+    }
   }, [user]);
 
   // Function to get all chores (for Manage Chores view)
   const getAllChores = useCallback(async () => {
-    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
-      throw new Error('Unauthorized access to manage chores');
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'MANAGER')) {
+      return [];
     }
-    return await choresApi.getAll();
+    try {
+      return await choresApi.getAll();
+    } catch (err) {
+      if (err.status === 401) {
+        return []; // Return empty array for unauthorized users
+      }
+      throw err;
+    }
   }, [user]);
 
   const { 
@@ -38,22 +53,23 @@ export const ChoresProvider = ({ children }) => {
     loading: personalLoading, 
     error: personalError,
     execute: fetchPersonalChores 
-  } = useApi(getPersonalChores);
+  } = useApi(getPersonalChores, !!user); // Only fetch if user exists
 
   const {
     data: allChores,
     loading: allLoading,
     error: allError,
     execute: fetchAllChores
-  } = useApi(() => null, false); // Don't fetch automatically, only when requested
+  } = useApi(() => null, false); // Don't fetch automatically
 
   const toggleChoreComplete = useCallback(async (choreId) => {
+    if (!user) return;
+    
     try {
       setError(null);
       
       const currentChore = await choresApi.getById(choreId);
       
-      // For completing chores, only check if the chore is assigned to the user
       if (currentChore.assigned_to !== user.id) {
         throw new Error('You can only complete chores assigned to you');
       }
@@ -62,7 +78,7 @@ export const ChoresProvider = ({ children }) => {
       
       await new Promise(resolve => setTimeout(resolve, 100));
       await fetchPersonalChores();
-      // If we're in manage view, refresh that too
+      
       if (user.role === 'ADMIN' || user.role === 'MANAGER') {
         await fetchAllChores();
       }
@@ -73,30 +89,17 @@ export const ChoresProvider = ({ children }) => {
     }
   }, [fetchPersonalChores, fetchAllChores, user]);
 
-  // Debug log for the context value
   const value = {
-    // For Dashboard
     personalChores: personalChores || [],
     personalLoading,
-    
-    // For Manage Chores
     allChores: allChores || [],
     allLoading,
     canManageChores: user?.role === 'ADMIN' || user?.role === 'MANAGER',
-    
-    // Shared
     error: error || personalError || allError,
     toggleChoreComplete,
     refreshPersonalChores: fetchPersonalChores,
     refreshAllChores: fetchAllChores
   };
-  
-  console.log('ChoresContext value:', {
-    personalChoresCount: value.personalChores.length,
-    allChoresCount: value.allChores.length,
-    userRole: user?.role,
-    userId: user?.id
-  });
 
   return (
     <ChoresContext.Provider value={value}>

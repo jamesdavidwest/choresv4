@@ -3,24 +3,42 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { auth } from '../services/api';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
+
+const publicRoutes = ['/signin', '/signup', '/'];
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Effect to check authentication status on mount
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        if (localStorage.getItem('token')) {
+        const currentPath = window.location.pathname;
+        
+        // If we're on a public route, just set loading to false
+        if (publicRoutes.includes(currentPath)) {
+          setLoading(false);
+          return;
+        }
+
+        // Check for token
+        const token = localStorage.getItem('token');
+        if (!token) {
+          window.location.pathname = '/signin';
+          return;
+        }
+
+        // Try to get current user
+        try {
           const userData = await auth.getCurrentUser();
           setUser(userData);
+        } catch (error) {
+          console.error('Failed to get current user:', error);
+          if (!publicRoutes.includes(currentPath)) {
+            window.location.pathname = '/signin';
+          }
         }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        auth.logout();
-        window.location.href = '/signin'; // Use window.location for initial redirect
       } finally {
         setLoading(false);
       }
@@ -34,7 +52,7 @@ export const AuthProvider = ({ children }) => {
       const response = await auth.login(credentials);
       if (response.user) {
         setUser(response.user);
-        window.location.href = '/dashboard'; // Use window.location for login redirect
+        window.location.pathname = '/dashboard';
         return response.user;
       }
       throw new Error('Invalid response from server');
@@ -47,7 +65,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     auth.logout();
     setUser(null);
-    window.location.href = '/signin'; // Use window.location for logout redirect
+    window.location.pathname = '/signin';
   };
 
   if (loading) {
@@ -59,7 +77,13 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      isAuthenticated: !!user,
+      loading 
+    }}>
       {children}
     </AuthContext.Provider>
   );
