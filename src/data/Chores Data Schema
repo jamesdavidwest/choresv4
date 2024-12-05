@@ -1,0 +1,59 @@
+// Users and Authentication
+Table users {
+  id int [pk, increment]
+  name varchar
+  email varchar [unique]
+  role enum('ADMIN', 'MANAGER', 'USER')
+  created_at timestamp
+}
+
+// Core Chores Management
+Table chores {
+  id int [pk, increment]
+  name varchar
+  category int
+  frequency varchar
+  description text
+  notes text        // Added field for additional notes
+  created_at timestamp
+}
+
+// Chore Assignments
+Table chore_assignments {
+  id int [pk, increment]
+  chore_id int [ref: > chores.id]
+  assigned_to int [ref: > users.id]
+  assigned_by int [ref: > users.id]
+  assigned_at timestamp
+  is_complete boolean
+  last_completed timestamp
+  due_date timestamp
+}
+
+// Categories for Organization
+Table categories {
+  id int [pk, increment]
+  name varchar
+  description text
+}
+
+// Chore History for Tracking
+Table chore_history {
+  id int [pk, increment]
+  chore_id int [ref: > chores.id]
+  completed_by int [ref: > users.id]
+  completed_at timestamp
+  notes text
+}
+
+// Recurring Schedule Management
+Table schedules {
+  id int [pk, increment]
+  chore_id int [ref: > chores.id]
+  frequency_type enum('DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY')
+  frequency_value int
+  created_at timestamp
+}
+
+// Relationships
+Ref: chores.category > categories.id

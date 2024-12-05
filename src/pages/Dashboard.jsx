@@ -9,7 +9,7 @@ import { locations as locationsApi } from '../services/api';
 import QuickStats from '../components/dashboard/QuickStats';
 
 const FREQUENCIES = {
-  0: 'All',
+  0: 'All Frequencies',
   1: 'Daily',
   2: 'Weekly', 
   3: 'Monthly',
@@ -17,6 +17,7 @@ const FREQUENCIES = {
   5: 'Yearly'
 };
 
+// Rest of the file remains exactly the same
 const Dashboard = () => {
   const { user } = useAuth();
   const { personalChores: chores, personalLoading: isLoadingChores, error: choresError, toggleChoreComplete } = useChores();

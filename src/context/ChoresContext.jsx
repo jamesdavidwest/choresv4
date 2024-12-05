@@ -10,7 +10,6 @@ export const ChoresProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const { user } = useAuth();
   
-  // Function to get personal chores (for Dashboard)
   const getPersonalChores = useCallback(async () => {
     if (!user) {
       return [];
@@ -27,13 +26,12 @@ export const ChoresProvider = ({ children }) => {
       return filteredChores;
     } catch (err) {
       if (err.status === 401) {
-        return []; // Return empty array for unauthorized users
+        return [];
       }
       throw err;
     }
   }, [user]);
 
-  // Function to get all chores (for Manage Chores view)
   const getAllChores = useCallback(async () => {
     if (!user || (user.role !== 'ADMIN' && user.role !== 'MANAGER')) {
       return [];
@@ -42,7 +40,7 @@ export const ChoresProvider = ({ children }) => {
       return await choresApi.getAll();
     } catch (err) {
       if (err.status === 401) {
-        return []; // Return empty array for unauthorized users
+        return [];
       }
       throw err;
     }
@@ -53,37 +51,59 @@ export const ChoresProvider = ({ children }) => {
     loading: personalLoading, 
     error: personalError,
     execute: fetchPersonalChores 
-  } = useApi(getPersonalChores, !!user); // Only fetch if user exists
+  } = useApi(getPersonalChores, !!user);
 
   const {
     data: allChores,
     loading: allLoading,
     error: allError,
     execute: fetchAllChores
-  } = useApi(() => null, false); // Don't fetch automatically
+  } = useApi(() => null, false);
 
   const toggleChoreComplete = useCallback(async (choreId) => {
-    if (!user) return;
+    if (!user) {
+      throw new Error('User must be logged in to update chores');
+    }
     
     try {
       setError(null);
+      console.log('Starting toggle for chore:', choreId);
       
+      // First, get the current chore to check its status
       const currentChore = await choresApi.getById(choreId);
+      console.log('Current chore data:', currentChore);
       
       if (currentChore.assigned_to !== user.id) {
         throw new Error('You can only complete chores assigned to you');
       }
       
-      await choresApi.toggleComplete(choreId, !currentChore.is_complete);
+      // Toggle the completion status
+      const newStatus = !currentChore.is_complete;
+      console.log('Updating chore status to:', newStatus);
       
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Update the chore
+      await choresApi.update(choreId, {
+        ...currentChore,
+        is_complete: newStatus,
+        last_completed: newStatus ? new Date().toISOString() : null
+      });
+      
+      console.log('Update successful, refreshing data...');
+      
+      // Refresh the data
       await fetchPersonalChores();
       
       if (user.role === 'ADMIN' || user.role === 'MANAGER') {
         await fetchAllChores();
       }
+      
+      return true;
     } catch (err) {
-      console.error('ChoresContext error:', err);
+      console.error('Toggle chore error:', {
+        error: err,
+        choreId,
+        userId: user?.id
+      });
       setError(err.message || 'Failed to update chore');
       throw err;
     }
