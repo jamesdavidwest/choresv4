@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { format } from 'date-fns';
 
@@ -28,18 +28,39 @@ const ChoreModal = ({
   onToggleComplete,
   currentDate
 }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   if (!isOpen || !chore) return null;
 
   const frequencyName = FREQUENCY_NAMES[chore.frequency_id] || 'Unknown';
   const locationName = LOCATION_NAMES[chore.location_id] || 'Unknown';
   const formattedDate = currentDate ? format(new Date(currentDate), 'PPP') : 'Not specified';
 
+  const handleToggle = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await onToggleComplete(chore.id);
+    } catch (error) {
+      console.error('Failed to toggle chore:', error);
+      setError(error.message || 'Failed to update chore status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setError(null);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal */}
@@ -58,6 +79,13 @@ const ChoreModal = ({
               {chore.is_complete ? 'Completed' : 'Pending'}
             </span>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
 
           {/* Content */}
           <div className="space-y-4">
@@ -99,20 +127,32 @@ const ChoreModal = ({
           {/* Footer */}
           <div className="mt-6 flex justify-end space-x-3">
             <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+              onClick={handleClose}
+              disabled={isLoading}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Close
             </button>
             <button
-              onClick={() => onToggleComplete(chore.id)}
-              className={`px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+              onClick={handleToggle}
+              disabled={isLoading}
+              className={`px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 chore.is_complete
                   ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
                   : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
               }`}
             >
-              {chore.is_complete ? 'Mark Incomplete' : 'Mark Complete'}
+              {isLoading ? (
+                <span className="flex items-center space-x-2">
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{chore.is_complete ? 'Marking incomplete...' : 'Marking complete...'}</span>
+                </span>
+              ) : (
+                <span>{chore.is_complete ? 'Mark Incomplete' : 'Mark Complete'}</span>
+              )}
             </button>
           </div>
         </div>

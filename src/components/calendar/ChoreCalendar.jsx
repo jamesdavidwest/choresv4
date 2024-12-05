@@ -9,10 +9,18 @@ import { useChores } from '../../context/ChoresContext';
 import ChoreModal from './ChoreModal';
 
 const ChoreCalendar = ({ chores }) => {
-  const { toggleChoreComplete } = useChores();
+  const { toggleChoreComplete, refreshPersonalChores, refreshAllChores, canManageChores } = useChores();
   const [selectedChore, setSelectedChore] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [events, setEvents] = useState([]);
+
+  // Update events when chores change
+  useEffect(() => {
+    const newEvents = transformChoresToEvents(chores, new Date(), null);
+    setEvents(newEvents);
+    console.log('Calendar events updated:', newEvents);
+  }, [chores]);
 
   const handleEventClick = useCallback((clickInfo) => {
     const { choreId } = clickInfo.event.extendedProps;
@@ -20,44 +28,30 @@ const ChoreCalendar = ({ chores }) => {
     
     if (chore) {
       setSelectedChore(chore);
-      setSelectedDate(clickInfo.event.start);
+      setSelectedDate(clickInfo.event.start.toISOString());
       setIsModalOpen(true);
     }
   }, [chores]);
 
   const handleToggleComplete = useCallback(async (choreId) => {
     try {
-      const chore = chores.find(c => c.id === choreId);
-      if (!chore) {
-        console.error('Chore not found:', choreId);
-        return;
+      await toggleChoreComplete(choreId);
+      
+      // Refresh both personal and all chores as needed
+      await refreshPersonalChores();
+      if (canManageChores) {
+        await refreshAllChores();
       }
       
-      console.log('Toggling chore:', {
-        choreId,
-        currentStatus: chore.is_complete,
-        newStatus: !chore.is_complete
-      });
-
-      // Toggle the completion status
-      const result = await toggleChoreComplete(choreId);
-      console.log('Toggle result:', result);
-      
-      // Close modal after successful toggle
       setIsModalOpen(false);
-      
-      // Update the selected chore's status locally
-      setSelectedChore(prev => prev ? { ...prev, is_complete: !prev.is_complete } : null);
+      setSelectedChore(null);
+
     } catch (error) {
-      console.error('Toggle error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        fullError: error
-      });
+      console.error('Toggle error:', error);
+      // Here you might want to show an error toast
       throw error;
     }
-  }, [chores, toggleChoreComplete]);
+  }, [toggleChoreComplete, refreshPersonalChores, refreshAllChores, canManageChores]);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
@@ -66,18 +60,11 @@ const ChoreCalendar = ({ chores }) => {
   }, []);
 
   const handleDatesSet = useCallback((dateInfo) => {
-    console.log('Calendar date range changed:', {
+    console.log('Calendar date range:', {
       start: dateInfo.start,
       end: dateInfo.end
     });
   }, []);
-
-  // Transform chores into calendar events
-  const events = transformChoresToEvents(chores, new Date(), null);
-
-  useEffect(() => {
-    console.log('Calendar events updated:', events);
-  }, [events]);
 
   return (
     <div className="bg-background">

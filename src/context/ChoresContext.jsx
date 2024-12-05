@@ -25,6 +25,7 @@ export const ChoresProvider = ({ children }) => {
       console.log('Filtered chores:', filteredChores);
       return filteredChores;
     } catch (err) {
+      console.error('Error in getPersonalChores:', err);
       if (err.status === 401) {
         return [];
       }
@@ -39,6 +40,7 @@ export const ChoresProvider = ({ children }) => {
     try {
       return await choresApi.getAll();
     } catch (err) {
+      console.error('Error in getAllChores:', err);
       if (err.status === 401) {
         return [];
       }
@@ -73,7 +75,11 @@ export const ChoresProvider = ({ children }) => {
       const currentChore = await choresApi.getById(choreId);
       console.log('Current chore data:', currentChore);
       
-      if (currentChore.assigned_to !== user.id) {
+      if (!currentChore) {
+        throw new Error(`Chore not found: ${choreId}`);
+      }
+
+      if (currentChore.assigned_to !== user.id && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
         throw new Error('You can only complete chores assigned to you');
       }
       
@@ -101,6 +107,10 @@ export const ChoresProvider = ({ children }) => {
     } catch (err) {
       console.error('Toggle chore error:', {
         error: err,
+        message: err.message,
+        stack: err.stack,
+        status: err.status,
+        data: err.data,
         choreId,
         userId: user?.id
       });

@@ -30,15 +30,30 @@ const fetchWithTimeout = (resource, options = {}) => {
 const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
   try {
     const token = localStorage.getItem('token');
+    if (!token && endpoint !== '/auth/login') {
+      console.error('No token found for authenticated request');
+      throw new ApiError('Authentication required', 401, null, functionName);
+    }
+
     const headers = {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     };
 
+    console.log(`API Request: ${endpoint}`, {
+      method: options.method || 'GET',
+      headers: { ...headers, Authorization: token ? 'Bearer [REDACTED]' : undefined }
+    });
+
     const response = await fetchWithTimeout(`${API_URL}${endpoint}`, {
       ...options,
       headers,
+    });
+
+    console.log(`API Response: ${endpoint}`, {
+      status: response.status,
+      statusText: response.statusText
     });
 
     if (response.status === 401) {
@@ -70,11 +85,20 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
     }
 
     try {
-      return await response.json();
+      const data = await response.json();
+      console.log(`API Data: ${endpoint}`, data);
+      return data;
     } catch (e) {
       throw new ApiError('Invalid response from server', 500, null, functionName);
     }
   } catch (error) {
+    console.error(`API Error in ${functionName}:`, {
+      message: error.message,
+      status: error.status,
+      data: error.data,
+      stack: error.stack
+    });
+
     if (error.name === 'AbortError') {
       throw new ApiError('Request timeout - please try again', 408, null, functionName);
     }
@@ -84,6 +108,110 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
     }
     throw new ApiError(error.message || 'Network error', 0, null, functionName);
   }
+};
+
+// Previous auth, users, and locations exports remain the same...
+
+export const chores = {
+  getAll: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return fetchWithAuth(
+      `/chores${queryString ? `?${queryString}` : ''}`,
+      {},
+      'chores.getAll'
+    );
+  },
+
+  getById: (id) => {
+    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.getById');
+    return fetchWithAuth(`/chores/${id}`, {}, 'chores.getById');
+  },
+
+  create: (choreData) => {
+    if (!choreData.name || !choreData.frequency_id || !choreData.location_id) {
+      throw new ApiError('Name, frequency, and location are required', 400, null, 'chores.create');
+    }
+    return fetchWithAuth('/chores', {
+      method: 'POST',
+      body: JSON.stringify(choreData),
+    }, 'chores.create');
+  },
+
+  update: async (id, choreData) => {
+    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.update');
+    
+    try {
+      // First verify the chore exists
+      const existingChore = await fetchWithAuth(`/chores/${id}`, {}, 'chores.update.verify');
+      
+      if (!existingChore) {
+        throw new ApiError('Chore not found', 404, null, 'chores.update');
+      }
+
+      // Then perform the update
+      return await fetchWithAuth(`/chores/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(choreData),
+      }, 'chores.update');
+    } catch (error) {
+      console.error('Update chore error:', {
+        id,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  },
+
+  delete: (id) => {
+    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.delete');
+    return fetchWithAuth(`/chores/${id}`, {
+      method: 'DELETE',
+    }, 'chores.delete');
+  },
+
+  toggleComplete: async (id) => {
+    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.toggleComplete');
+    
+    try {
+      // Get current chore state
+      const currentChore = await fetchWithAuth(`/chores/${id}`, {}, 'chores.toggleComplete.get');
+      
+      if (!currentChore) {
+        throw new ApiError('Chore not found', 404, null, 'chores.toggleComplete');
+      }
+
+      // Toggle the completion status
+      const updatedChore = {
+        ...currentChore,
+        is_complete: !currentChore.is_complete,
+        last_completed: !currentChore.is_complete ? new Date().toISOString() : null
+      };
+
+      // Perform the update
+      return await fetchWithAuth(`/chores/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedChore),
+      }, 'chores.toggleComplete.update');
+    } catch (error) {
+      console.error('Toggle complete error:', {
+        id,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  },
+
+  batchUpdate: (updates) => {
+    if (!Array.isArray(updates) || !updates.length) {
+      throw new ApiError('Updates array is required', 400, null, 'chores.batchUpdate');
+    }
+    return fetchWithAuth('/chores/batch', {
+      method: 'PUT',
+      body: JSON.stringify({ updates }),
+    }, 'chores.batchUpdate');
+  },
 };
 
 export const auth = {
@@ -142,90 +270,6 @@ export const locations = {
     if (!id) throw new ApiError('Location ID is required', 400, null, 'locations.getById');
     return fetchWithAuth(`/locations/${id}`, {}, 'locations.getById');
   }
-};
-
-export const chores = {
-  getAll: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    return fetchWithAuth(
-      `/chores${queryString ? `?${queryString}` : ''}`,
-      {},
-      'chores.getAll'
-    );
-  },
-
-  getById: (id) => {
-    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.getById');
-    return fetchWithAuth(`/chores/${id}`, {}, 'chores.getById');
-  },
-
-  create: (choreData) => {
-    if (!choreData.name || !choreData.frequency_id || !choreData.location_id) {
-      throw new ApiError('Name, frequency, and location are required', 400, null, 'chores.create');
-    }
-    return fetchWithAuth('/chores', {
-      method: 'POST',
-      body: JSON.stringify(choreData),
-    }, 'chores.create');
-  },
-
-  update: (id, choreData) => {
-    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.update');
-    return fetchWithAuth(`/chores/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(choreData),
-    }, 'chores.update');
-  },
-
-  delete: (id) => {
-    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.delete');
-    return fetchWithAuth(`/chores/${id}`, {
-      method: 'DELETE',
-    }, 'chores.delete');
-  },
-
-  toggleComplete: async (id, isComplete) => {
-    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.toggleComplete');
-    
-    const maxRetries = 3;
-    let lastError;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        return await fetchWithAuth(`/chores/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            is_complete: isComplete,
-            last_completed: isComplete ? new Date().toISOString() : null,
-          }),
-        }, 'chores.toggleComplete');
-      } catch (error) {
-        lastError = error;
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-          continue;
-        }
-        throw new ApiError(
-          `Failed after ${maxRetries} attempts: ${error.message}`,
-          error.status || 500,
-          error.data,
-          'chores.toggleComplete'
-        );
-      }
-    }
-    
-    throw lastError;
-  },
-
-  batchUpdate: (updates) => {
-    if (!Array.isArray(updates) || !updates.length) {
-      throw new ApiError('Updates array is required', 400, null, 'chores.batchUpdate');
-    }
-    return fetchWithAuth('/chores/batch', {
-      method: 'PUT',
-      body: JSON.stringify({ updates }),
-    }, 'chores.batchUpdate');
-  },
 };
 
 export { ApiError };
