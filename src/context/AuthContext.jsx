@@ -1,6 +1,5 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { auth } from '../services/api';
 
@@ -9,7 +8,6 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   // Effect to check authentication status on mount
   useEffect(() => {
@@ -22,21 +20,21 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Auth initialization error:', error);
         auth.logout();
-        navigate('/signin', { replace: true });
+        window.location.href = '/signin'; // Use window.location for initial redirect
       } finally {
         setLoading(false);
       }
     };
 
     initializeAuth();
-  }, [navigate]);
+  }, []);
 
   const login = async (credentials) => {
     try {
       const response = await auth.login(credentials);
       if (response.user) {
         setUser(response.user);
-        navigate('/dashboard', { replace: true });
+        window.location.href = '/dashboard'; // Use window.location for login redirect
         return response.user;
       }
       throw new Error('Invalid response from server');
@@ -49,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     auth.logout();
     setUser(null);
-    navigate('/signin', { replace: true });
+    window.location.href = '/signin'; // Use window.location for logout redirect
   };
 
   if (loading) {

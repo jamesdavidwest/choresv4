@@ -8,7 +8,12 @@ import ChoresTable from './ChoresTable';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { chores, loading: isLoadingChores, error: choresError, toggleChoreComplete } = useChores();
+  const { 
+    personalChores: chores, 
+    personalLoading: isLoadingChores, 
+    error: choresError, 
+    toggleChoreComplete 
+  } = useChores();
   const { data: locations, loading: isLoadingLocations } = useApi(locationsApi.getAll);
   const stats = useChoresStats(chores);
 

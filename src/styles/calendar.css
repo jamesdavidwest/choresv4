@@ -1,0 +1,71 @@
+/* Calendar Event Styles */
+.chore-event {
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+
+.status-completed {
+    opacity: 0.7;
+}
+
+.status-overdue {
+    border: 2px solid #F44336 !important;
+}
+
+.status-pending {
+    border-style: dashed !important;
+}
+
+/* FullCalendar Overrides */
+.fc-event {
+    cursor: pointer;
+}
+
+.fc-event-title {
+    font-weight: 500;
+}
+
+.fc-event .fc-content {
+    padding: 2px 4px;
+}
+
+.fc-event .fc-location {
+    font-size: 0.8em;
+    opacity: 0.8;
+}
+
+.fc-event .fc-assigned {
+    font-size: 0.8em;
+    font-style: italic;
+}
+
+/* Loading States */
+.calendar-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+    .fc-header-toolbar {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .fc-toolbar-chunk {
+        display: flex;
+        justify-content: center;
+    }
+    
+    .fc-view-harness {
+        height: calc(100vh - 200px) !important;
+    }
+}

@@ -1,0 +1,77 @@
+/* Calendar Dark Mode Styles */
+.fc {
+  background-color: rgb(30, 41, 59) !important;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  color: #fff !important;
+}
+
+.fc .fc-toolbar-title {
+  color: #fff !important;
+}
+
+.fc .fc-button {
+  background-color: rgb(37, 99, 235) !important;
+  border-color: rgb(29, 78, 216) !important;
+}
+
+.fc .fc-button:hover {
+  background-color: rgb(29, 78, 216) !important;
+}
+
+.fc .fc-button-active {
+  background-color: rgb(29, 78, 216) !important;
+}
+
+.fc-theme-standard td, 
+.fc-theme-standard th {
+  border-color: rgb(51, 65, 85) !important;
+}
+
+.fc .fc-day-today {
+  background-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+.fc-event {
+  border-radius: 0.25rem;
+  padding: 2px 4px;
+  margin: 1px 0;
+  cursor: pointer;
+}
+
+.fc-event-title {
+  font-weight: 500;
+}
+
+.fc-daygrid-day-number,
+.fc-col-header-cell-cushion {
+  color: #fff !important;
+}
+
+.fc-daygrid-event {
+  white-space: normal !important;
+  align-items: center !important;
+  font-size: 0.875rem !important;
+}
+
+/* Status-based colors */
+.status-completed { opacity: 0.7; }
+.status-overdue { border: 2px solid #ef4444 !important; }
+.status-pending { border-style: dashed !important; }
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.25rem;
+  }
+
+  .fc .fc-button {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}

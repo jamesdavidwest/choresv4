@@ -4,7 +4,7 @@ import ChoresTableHeader from './ChoresTableHeader';
 import ChoresTableRow from './ChoresTableRow';
 
 const ChoresTable = ({ chores, locations, onToggleComplete, isLoading }) => {
-  const [activeFrequency, setActiveFrequency] = useState('0');
+  const [activeFrequency, setActiveFrequency] = useState('1'); // Changed default to '1' for Daily
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   
   const frequencyTypes = {
