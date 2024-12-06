@@ -9,10 +9,11 @@ import { useChores } from '../../context/ChoresContext';
 import ChoreModal from './ChoreModal';
 
 const ChoreCalendar = ({ chores }) => {
-  const { toggleChoreComplete, refreshPersonalChores, refreshAllChores, canManageChores } = useChores();
+  const { toggleChoreComplete, createChore, refreshPersonalChores, refreshAllChores, canManageChores } = useChores();
   const [selectedChore, setSelectedChore] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState('view');
   const [events, setEvents] = useState([]);
 
   // Update events when chores change
@@ -29,6 +30,7 @@ const ChoreCalendar = ({ chores }) => {
     if (chore) {
       setSelectedChore(chore);
       setSelectedDate(clickInfo.event.start.toISOString());
+      setModalMode('view');
       setIsModalOpen(true);
     }
   }, [chores]);
@@ -45,18 +47,56 @@ const ChoreCalendar = ({ chores }) => {
       
       setIsModalOpen(false);
       setSelectedChore(null);
+      setModalMode('view');
 
     } catch (error) {
       console.error('Toggle error:', error);
-      // Here you might want to show an error toast
       throw error;
     }
   }, [toggleChoreComplete, refreshPersonalChores, refreshAllChores, canManageChores]);
+
+  const handleCreateChore = useCallback(async (choreData) => {
+    try {
+      await createChore({
+        ...choreData,
+        due_date: selectedDate
+      });
+      
+      // Refresh chores after creation
+      await refreshPersonalChores();
+      if (canManageChores) {
+        await refreshAllChores();
+      }
+      
+      setIsModalOpen(false);
+      setSelectedDate(null);
+      setModalMode('view');
+
+    } catch (error) {
+      console.error('Create error:', error);
+      throw error;
+    }
+  }, [createChore, selectedDate, refreshPersonalChores, refreshAllChores, canManageChores]);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setSelectedChore(null);
     setSelectedDate(null);
+    setModalMode('view');
+  }, []);
+
+  const handleDateSelect = useCallback((selectInfo) => {
+    if (canManageChores) {
+      setSelectedDate(selectInfo.startStr);
+      setModalMode('create');
+      setIsModalOpen(true);
+    }
+  }, [canManageChores]);
+
+  const handleCreateClick = useCallback(() => {
+    setSelectedDate(new Date().toISOString());
+    setModalMode('create');
+    setIsModalOpen(true);
   }, []);
 
   const handleDatesSet = useCallback((dateInfo) => {
@@ -69,6 +109,16 @@ const ChoreCalendar = ({ chores }) => {
   return (
     <div className="bg-background">
       <div className="p-4">
+        {canManageChores && (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={handleCreateClick}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              Create New Chore
+            </button>
+          </div>
+        )}
         <div className="card bg-card shadow-lg rounded-lg overflow-hidden">
           <div className="card-body">
             <FullCalendar
@@ -81,7 +131,8 @@ const ChoreCalendar = ({ chores }) => {
               }}
               events={events}
               editable={false}
-              selectable={true}
+              selectable={canManageChores}
+              select={handleDateSelect}
               selectMirror={true}
               dayMaxEvents={true}
               weekends={true}
@@ -108,7 +159,9 @@ const ChoreCalendar = ({ chores }) => {
         onClose={handleCloseModal}
         chore={selectedChore}
         onToggleComplete={handleToggleComplete}
+        onSave={handleCreateChore}
         currentDate={selectedDate}
+        mode={modalMode}
       />
     </div>
   );

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { User, Lock } from 'lucide-react';
 import { Card } from '../ui/card';
 import { useAuth } from '../../context/AuthContext';
-import vacuumKidImage from '../../assets/vacuum_kid.png';
+import vacuumKidImage from '../../assets/boywithabroom.png';
 
 const SignIn = () => {
   const { login } = useAuth();

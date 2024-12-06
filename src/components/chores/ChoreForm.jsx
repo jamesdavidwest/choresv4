@@ -3,276 +3,33 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import database from '../../data/database.json';
 
-// Simplified frequency object
-const FREQUENCIES = {
-  1: 'Daily',
-  2: 'Weekly',
-  3: 'Monthly',
-  4: 'Quarterly',
-  5: 'Yearly',
-  6: 'Once'
-};
+// Previous code remains the same up until the return statement...
+// Fast-forward to the Yearly Specific Date section in the return statement:
 
-const ChoreForm = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const isEdit = !!id;
-
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    location: '',
-    frequency: '',
-    assignedUser: '',
-    description: '',
-    specificYearlyDate: null
-  });
-
-  // Validation state
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Role-based access check
-  useEffect(() => {
-    if (!user || !['ADMIN', 'MANAGER'].includes(user.role)) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [user, navigate]);
-
-  // Load existing chore data in edit mode
-  useEffect(() => {
-    const fetchChoreData = async () => {
-      if (isEdit) {
-        try {
-          // TODO: Implement actual data fetching
-          // const chore = await fetchChoreById(id);
-          // setFormData(chore);
-        } catch (error) {
-          console.error('Error fetching chore:', error);
-        }
-      }
-    };
-
-    fetchChoreData();
-  }, [id, isEdit]);
-
-  // Generate month options
-  const monthOptions = Array.from({length: 12}, (_, i) => ({
-    value: i,
-    label: new Date(0, i).toLocaleString('default', { month: 'long' })
-  }));
-
-  // Generate day options (1-31)
-  const dayOptions = Array.from({length: 31}, (_, i) => i + 1);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setIsSubmitting(true);
-
-    try {
-      // TODO: Implement actual submission logic
-      navigate('/chores');
-    } catch (error) {
-      console.error('Submission error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.name) newErrors.name = 'Chore name is required';
-    if (formData.name.length > 100) newErrors.name = 'Chore name must be 100 characters or less';
-    if (!formData.location) newErrors.location = 'Location is required';
-    if (!formData.frequency) newErrors.frequency = 'Frequency is required';
-    if (!formData.assignedUser) newErrors.assignedUser = 'Assigned user is required';
-
-    if (formData.frequency === '5' && formData.specificYearlyDate) {
-      if (formData.specificYearlyDate.month === undefined) {
-        newErrors.specificYearlyDate = 'Month is required for yearly chores';
-      }
-      if (formData.specificYearlyDate.day === undefined) {
-        newErrors.specificYearlyDate = 'Day is required for yearly chores';
-      }
-    }
-
-    if (formData.description && formData.description.length > 500) {
-      newErrors.description = 'Description must be 500 characters or less';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prevData => ({
-      ...prevData,
-      [name]: value
-    }));
-  };
-
-  const handleYearlyDateChange = (type, value) => {
-    setFormData(prevData => ({
-      ...prevData,
-      specificYearlyDate: {
-        ...prevData.specificYearlyDate,
-        [type]: parseInt(value, 10)
-      }
-    }));
-  };
-
-  const handleCancel = () => {
-    navigate('/chores');
-  };
-
-  if (!user || !['ADMIN', 'MANAGER'].includes(user.role)) {
-    return null;
-  }
-
-  return (
-    <div className="container mx-auto p-6 max-w-2xl bg-white dark:bg-dark-900 shadow-sm dark:shadow-dark-md transition-colors duration-300">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-dark-50">
-          {isEdit ? 'Edit Chore' : 'Create New Chore'}
-        </h1>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Chore Name */}
-        <div className="space-y-2">
-          <label htmlFor="name" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
-            Chore Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
-            maxLength={100}
-            required
-          />
-          {errors.name && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.name}</p>}
-        </div>
-
-        {/* Location */}
-        <div className="space-y-2">
-          <label htmlFor="location" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
-            Location
-          </label>
-          <select
-            id="location"
-            name="location"
-            value={formData.location}
-            onChange={handleChange}
-            className="w-full px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
-            required
-          >
-            <option value="">Select Location</option>
-            {database.locations.map(location => (
-              <option key={location.id} value={location.id}>{location.name}</option>
-            ))}
-          </select>
-          {errors.location && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.location}</p>}
-        </div>
-
-        {/* Frequency */}
-        <div className="space-y-2">
-          <label htmlFor="frequency" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
-            Frequency
-          </label>
-          <select
-            id="frequency"
-            name="frequency"
-            value={formData.frequency}
-            onChange={handleChange}
-            className="w-full px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
-            required
-          >
-            <option value="">Select Frequency</option>
-            {Object.entries(FREQUENCIES).map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-          </select>
-          {errors.frequency && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.frequency}</p>}
-        </div>
-
-        {/* Assigned User */}
-        <div className="space-y-2">
-          <label htmlFor="assignedUser" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
-            Assigned User
-          </label>
-          <select
-            id="assignedUser"
-            name="assignedUser"
-            value={formData.assignedUser}
-            onChange={handleChange}
-            className="w-full px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
-            required
-          >
-            <option value="">Select User</option>
-            {database.users
-              .filter(user => user.role === 'USER')
-              .map(user => (
-                <option key={user.id} value={user.id}>{user.name}</option>
-              ))
-            }
-          </select>
-          {errors.assignedUser && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.assignedUser}</p>}
-        </div>
-
-        {/* Description */}
-        <div className="space-y-2">
-          <label htmlFor="description" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
-            Description (Optional)
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200 resize-none min-h-[100px]"
-            maxLength={500}
-          />
-          {errors.description && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.description}</p>}
-        </div>
-
-        {/* Yearly Specific Date (if Yearly frequency is selected) */}
-        {formData.frequency === '5' && (
-          <div className="space-y-2">
-            <label className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
-              Specific Yearly Date (Optional)
-            </label>
-            <div className="flex space-x-4">
-              <select
-                value={formData.specificYearlyDate?.month ?? ''}
-                onChange={(e) => handleYearlyDateChange('month', e.target.value)}
-                className="w-1/2 px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
-              >
-                <option value="">Select Month</option>
-                {monthOptions.map((month) => (
-                  <option key={month.value} value={month.value}>{month.label}</option>
-                ))}
-              </select>
-              <select
-                value={formData.specificYearlyDate?.day ?? ''}
-                onChange={(e) => handleYearlyDateChange('day', e.target.value)}
-                className="w-1/2 px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
-              >
-                <option value="">Select Day</option>
-                {dayOptions.map((day) => (
-                  <option key={day} value={day}>{day}</option>
-                ))}
-              </select>
-            </div>
-            {errors.specificYearlyDate && (
-              <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.specificYearlyDate}</p>
-            )}
+                <select
+                  value={formData.specificYearlyDate?.month ?? ''}
+                  onChange={(e) => handleYearlyDateChange('month', e.target.value)}
+                  className="w-1/2 px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
+                >
+                  <option value="">Select Month</option>
+                  {monthOptions.map((month) => (
+                    <option key={month.value} value={month.value}>{month.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={formData.specificYearlyDate?.day ?? ''}
+                  onChange={(e) => handleYearlyDateChange('day', e.target.value)}
+                  className="w-1/2 px-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-dark-100 transition-colors duration-200"
+                >
+                  <option value="">Select Day</option>
+                  {dayOptions.map((day) => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                </select>
+              </div>
+              {errors.specificYearlyDate && (
+                <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.specificYearlyDate}</p>
+              )}
           </div>
         )}
 
