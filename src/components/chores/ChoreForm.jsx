@@ -3,23 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import database from '../../data/database.json';
 
-// Use actual data from database
-const LOCATIONS = database.locations.map(location => location.name);
-const FREQUENCIES = database.frequency_types.map(freq => freq.name.charAt(0).toUpperCase() + freq.name.slice(1));
-const USERS = database.users.filter(user => user.role !== 'SYSTEM').map(user => user.name);
+// Simplified frequency object
+const FREQUENCIES = {
+  1: 'Daily',
+  2: 'Weekly',
+  3: 'Monthly',
+  4: 'Quarterly',
+  5: 'Yearly',
+  6: 'Once'
+};
 
 const ChoreForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isEdit = !!id;
-
-  // Role-based access check
-  useEffect(() => {
-    if (!user || !['ADMIN', 'MANAGER'].includes(user.role)) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [user, navigate]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -35,14 +33,12 @@ const ChoreForm = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Generate month options
-  const monthOptions = Array.from({length: 12}, (_, i) => ({
-    value: i,
-    label: new Date(0, i).toLocaleString('default', { month: 'long' })
-  }));
-
-  // Generate day options (1-31)
-  const dayOptions = Array.from({length: 31}, (_, i) => i + 1);
+  // Role-based access check
+  useEffect(() => {
+    if (!user || !['ADMIN', 'MANAGER'].includes(user.role)) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Load existing chore data in edit mode
   useEffect(() => {
@@ -61,19 +57,40 @@ const ChoreForm = () => {
     fetchChoreData();
   }, [id, isEdit]);
 
-  // Validation logic
+  // Generate month options
+  const monthOptions = Array.from({length: 12}, (_, i) => ({
+    value: i,
+    label: new Date(0, i).toLocaleString('default', { month: 'long' })
+  }));
+
+  // Generate day options (1-31)
+  const dayOptions = Array.from({length: 31}, (_, i) => i + 1);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    setIsSubmitting(true);
+
+    try {
+      // TODO: Implement actual submission logic
+      navigate('/chores');
+    } catch (error) {
+      console.error('Submission error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
     if (!formData.name) newErrors.name = 'Chore name is required';
     if (formData.name.length > 100) newErrors.name = 'Chore name must be 100 characters or less';
-
     if (!formData.location) newErrors.location = 'Location is required';
     if (!formData.frequency) newErrors.frequency = 'Frequency is required';
     if (!formData.assignedUser) newErrors.assignedUser = 'Assigned user is required';
 
-    // Additional validation for yearly specific date
-    if (formData.frequency === 'Yearly' && formData.specificYearlyDate) {
+    if (formData.frequency === '5' && formData.specificYearlyDate) {
       if (formData.specificYearlyDate.month === undefined) {
         newErrors.specificYearlyDate = 'Month is required for yearly chores';
       }
@@ -90,7 +107,6 @@ const ChoreForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prevData => ({
@@ -99,7 +115,6 @@ const ChoreForm = () => {
     }));
   };
 
-  // Handle yearly date specific changes
   const handleYearlyDateChange = (type, value) => {
     setFormData(prevData => ({
       ...prevData,
@@ -110,37 +125,10 @@ const ChoreForm = () => {
     }));
   };
 
-  // Form submission handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-
-    try {
-      // TODO: Implement actual submission logic
-      // if (isEdit) {
-      //   await updateChore(id, formData);
-      // } else {
-      //   await createChore(formData);
-      // }
-      
-      navigate('/chores');
-    } catch (error) {
-      console.error('Submission error:', error);
-      // TODO: Add error handling UI
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Cancel handler
   const handleCancel = () => {
     navigate('/chores');
   };
 
-  // If user doesn't have proper role, don't render the form
   if (!user || !['ADMIN', 'MANAGER'].includes(user.role)) {
     return null;
   }
@@ -156,10 +144,7 @@ const ChoreForm = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Chore Name */}
         <div className="space-y-2">
-          <label 
-            htmlFor="name" 
-            className="block mb-2 text-gray-700 dark:text-dark-200 font-medium"
-          >
+          <label htmlFor="name" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
             Chore Name
           </label>
           <input
@@ -177,10 +162,7 @@ const ChoreForm = () => {
 
         {/* Location */}
         <div className="space-y-2">
-          <label 
-            htmlFor="location" 
-            className="block mb-2 text-gray-700 dark:text-dark-200 font-medium"
-          >
+          <label htmlFor="location" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
             Location
           </label>
           <select
@@ -192,8 +174,8 @@ const ChoreForm = () => {
             required
           >
             <option value="">Select Location</option>
-            {LOCATIONS.map(location => (
-              <option key={location} value={location}>{location}</option>
+            {database.locations.map(location => (
+              <option key={location.id} value={location.id}>{location.name}</option>
             ))}
           </select>
           {errors.location && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.location}</p>}
@@ -201,10 +183,7 @@ const ChoreForm = () => {
 
         {/* Frequency */}
         <div className="space-y-2">
-          <label 
-            htmlFor="frequency" 
-            className="block mb-2 text-gray-700 dark:text-dark-200 font-medium"
-          >
+          <label htmlFor="frequency" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
             Frequency
           </label>
           <select
@@ -216,8 +195,8 @@ const ChoreForm = () => {
             required
           >
             <option value="">Select Frequency</option>
-            {FREQUENCIES.map(frequency => (
-              <option key={frequency} value={frequency}>{frequency}</option>
+            {Object.entries(FREQUENCIES).map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
             ))}
           </select>
           {errors.frequency && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.frequency}</p>}
@@ -225,10 +204,7 @@ const ChoreForm = () => {
 
         {/* Assigned User */}
         <div className="space-y-2">
-          <label 
-            htmlFor="assignedUser" 
-            className="block mb-2 text-gray-700 dark:text-dark-200 font-medium"
-          >
+          <label htmlFor="assignedUser" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
             Assigned User
           </label>
           <select
@@ -240,19 +216,19 @@ const ChoreForm = () => {
             required
           >
             <option value="">Select User</option>
-            {USERS.map(userName => (
-              <option key={userName} value={userName}>{userName}</option>
-            ))}
+            {database.users
+              .filter(user => user.role === 'USER')
+              .map(user => (
+                <option key={user.id} value={user.id}>{user.name}</option>
+              ))
+            }
           </select>
           {errors.assignedUser && <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.assignedUser}</p>}
         </div>
 
         {/* Description */}
         <div className="space-y-2">
-          <label 
-            htmlFor="description" 
-            className="block mb-2 text-gray-700 dark:text-dark-200 font-medium"
-          >
+          <label htmlFor="description" className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
             Description (Optional)
           </label>
           <textarea
@@ -267,7 +243,7 @@ const ChoreForm = () => {
         </div>
 
         {/* Yearly Specific Date (if Yearly frequency is selected) */}
-        {formData.frequency === 'Yearly' && (
+        {formData.frequency === '5' && (
           <div className="space-y-2">
             <label className="block mb-2 text-gray-700 dark:text-dark-200 font-medium">
               Specific Yearly Date (Optional)
@@ -280,9 +256,7 @@ const ChoreForm = () => {
               >
                 <option value="">Select Month</option>
                 {monthOptions.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
+                  <option key={month.value} value={month.value}>{month.label}</option>
                 ))}
               </select>
               <select
@@ -292,16 +266,12 @@ const ChoreForm = () => {
               >
                 <option value="">Select Day</option>
                 {dayOptions.map((day) => (
-                  <option key={day} value={day}>
-                    {day}
-                  </option>
+                  <option key={day} value={day}>{day}</option>
                 ))}
               </select>
             </div>
             {errors.specificYearlyDate && (
-              <p className="text-red-500 dark:text-red-400 mt-1 text-sm">
-                {errors.specificYearlyDate}
-              </p>
+              <p className="text-red-500 dark:text-red-400 mt-1 text-sm">{errors.specificYearlyDate}</p>
             )}
           </div>
         )}

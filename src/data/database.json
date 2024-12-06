@@ -80,6 +80,10 @@
     {
       "id": 5,
       "name": "yearly"
+    },
+    {
+      "id": 6,
+      "name": "once"
     }
   ],
   "chores": [

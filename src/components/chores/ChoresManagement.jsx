@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { chores as choresApi, auth } from '../../services/api';
+import { chores as choresApi } from '../../services/api';
 import AdminChoresList from './AdminChoresList';
 import { Alert, AlertDescription } from '../ui/alert';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
+import database from '../../data/database.json';
 
 const ChoresManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [chores, setChores] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -23,32 +22,25 @@ const ChoresManagement = () => {
       return;
     }
 
-    fetchData();
+    fetchChores();
   }, [user, navigate]);
 
-  const fetchData = async () => {
+  const fetchChores = async () => {
     try {
       setLoading(true);
-      // Fetch chores
-      const fetchedChores = await choresApi.getAll();
-
-      // Fetch users (assuming auth service can get all users)
-      const fetchedUsers = await auth.getCurrentUser();
-
-      // Temporary locations (you might want to replace this with actual location fetching)
-      const fetchedLocations = [
-        { id: 1, name: 'Kitchen' },
-        { id: 2, name: 'Living Room' },
-        { id: 3, name: 'Bedroom' }
-      ];
-
-      setChores(fetchedChores);
-      setLocations(fetchedLocations);
-      
-      // Filter users if needed
-      setUsers(fetchedUsers.role === 'ADMIN' ? [] : [fetchedUsers]);
+      // Map the chores from database.json
+      setChores(database.chores.map(chore => {
+        const location = database.locations.find(l => l.id === chore.location_id);
+        const assignedUser = database.users.find(u => u.id === chore.assigned_to);
+        return {
+          ...chore,
+          locationName: location ? location.name : 'Unknown Location',
+          assignedUserName: assignedUser ? assignedUser.name : 'Unassigned',
+          is_complete: false // You might want to get this from another source
+        };
+      }));
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error loading chores:', error);
       setError('Failed to load chores data. Please try again later.');
     } finally {
       setLoading(false);
@@ -57,7 +49,7 @@ const ChoresManagement = () => {
 
   const handleDelete = async (choreId) => {
     try {
-      await choresApi.delete(choreId);
+      // Filter out the deleted chore immediately
       setChores(prevChores => prevChores.filter(chore => chore.id !== choreId));
       setSuccessMessage('Chore deleted successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -70,10 +62,10 @@ const ChoresManagement = () => {
 
   const handleUpdateChore = async (choreId, updates) => {
     try {
-      const updatedChore = await choresApi.update(choreId, updates);
+      // Update the chore in the local state
       setChores(prevChores =>
         prevChores.map(chore =>
-          chore.id === choreId ? updatedChore : chore
+          chore.id === choreId ? { ...chore, ...updates } : chore
         )
       );
       setSuccessMessage('Chore updated successfully');
@@ -98,6 +90,19 @@ const ChoresManagement = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 p-6">
       <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+            Chores Management
+          </h1>
+          <Link
+            to="/chores/new"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
+          >
+            <Plus size={20} />
+            Create New Chore
+          </Link>
+        </div>
+
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription className="flex items-center justify-between">
@@ -122,8 +127,6 @@ const ChoresManagement = () => {
 
         <AdminChoresList
           chores={chores}
-          locations={locations}
-          users={users}
           onDelete={handleDelete}
           onUpdateChore={handleUpdateChore}
         />

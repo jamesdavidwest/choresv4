@@ -11,6 +11,7 @@ import { useAuth } from './context/AuthContext';
 const Calendar = lazy(() => import('./pages/calendar/index.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Chores = lazy(() => import('./components/chores/ChoresManagement.jsx'));
+const ChoreForm = lazy(() => import('./components/chores/ChoreForm.jsx'));
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -51,32 +52,14 @@ const AdminRoute = ({ children }) => {
 };
 
 // Wrap lazy components with Suspense and ErrorBoundary
-const WrappedCalendar = () => (
+const withSuspense = (Component) => (
   <ErrorBoundary>
-    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-    </div>}>
-      <Calendar />
-    </Suspense>
-  </ErrorBoundary>
-);
-
-const WrappedDashboard = () => (
-  <ErrorBoundary>
-    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-    </div>}>
-      <Dashboard />
-    </Suspense>
-  </ErrorBoundary>
-);
-
-const WrappedChores = () => (
-  <ErrorBoundary>
-    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-    </div>}>
-      <Chores />
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <Component />
     </Suspense>
   </ErrorBoundary>
 );
@@ -100,15 +83,23 @@ export const router = [
       },
       {
         path: 'calendar',
-        element: <ProtectedRoute><WrappedCalendar /></ProtectedRoute>
+        element: <ProtectedRoute>{withSuspense(Calendar)}</ProtectedRoute>
       },
       {
         path: 'dashboard',
-        element: <ProtectedRoute><WrappedDashboard /></ProtectedRoute>
+        element: <ProtectedRoute>{withSuspense(Dashboard)}</ProtectedRoute>
       },
       {
         path: 'chores',
-        element: <AdminRoute><WrappedChores /></AdminRoute>
+        element: <AdminRoute>{withSuspense(Chores)}</AdminRoute>
+      },
+      {
+        path: 'chores/new',
+        element: <AdminRoute>{withSuspense(ChoreForm)}</AdminRoute>
+      },
+      {
+        path: 'chores/edit/:id',
+        element: <AdminRoute>{withSuspense(ChoreForm)}</AdminRoute>
       }
     ]
   }
