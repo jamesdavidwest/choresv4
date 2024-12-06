@@ -5,7 +5,7 @@ import { Dropdown } from '../ui/dropdown';
 import { chores as choresApi, users as usersApi, locations as locationsApi } from '../../services/api';
 
 const FREQUENCIES = {
-  0: 'All',
+  0: 'All Frequencies',
   1: 'Daily',
   2: 'Weekly', 
   3: 'Monthly',
@@ -13,6 +13,7 @@ const FREQUENCIES = {
   5: 'Yearly'
 };
 
+// Rest of the file remains exactly the same
 const AdminChoresList = () => {
   const { user } = useAuth();
   const [chores, setChores] = useState([]);

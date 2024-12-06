@@ -1,6 +1,6 @@
 // src/components/layout/Toolbar.jsx
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, LogOut, Calendar } from 'lucide-react';
+import { Home, LogOut, Calendar, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useEffect, useState } from 'react';
 
@@ -63,6 +63,17 @@ const Toolbar = () => {
                 >
                   <Calendar className="h-5 w-5 text-gray-600 dark:text-dark-300" />
                 </Link>
+
+                {/* Chores Link - Only visible to admin */}
+                {user.role === 'ADMIN' && (
+                  <Link 
+                    to="/chores" 
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-full transition-colors duration-200"
+                    title="Manage Chores"
+                  >
+                    <ClipboardList className="h-5 w-5 text-gray-600 dark:text-dark-300" />
+                  </Link>
+                )}
               </>
             )}
           </div>

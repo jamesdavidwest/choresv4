@@ -10,6 +10,7 @@ import { useAuth } from './context/AuthContext';
 // Lazy load these components
 const Calendar = lazy(() => import('./pages/calendar/index.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Chores = lazy(() => import('./components/chores/ChoresManagement.jsx'));
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -25,6 +26,25 @@ const ProtectedRoute = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/signin" replace />;
+  }
+
+  return children;
+};
+
+// Admin Route Component
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'ADMIN') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -47,6 +67,16 @@ const WrappedDashboard = () => (
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
     </div>}>
       <Dashboard />
+    </Suspense>
+  </ErrorBoundary>
+);
+
+const WrappedChores = () => (
+  <ErrorBoundary>
+    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    </div>}>
+      <Chores />
     </Suspense>
   </ErrorBoundary>
 );
@@ -75,6 +105,10 @@ export const router = [
       {
         path: 'dashboard',
         element: <ProtectedRoute><WrappedDashboard /></ProtectedRoute>
+      },
+      {
+        path: 'chores',
+        element: <AdminRoute><WrappedChores /></AdminRoute>
       }
     ]
   }
