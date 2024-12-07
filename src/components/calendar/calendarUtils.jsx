@@ -4,52 +4,43 @@ export const formatDate = (date) => {
 };
 
 // Convert chore to calendar event
-export const choreToEvent = (chore) => {
+export const choreToEvent = (chore, instance = null) => {
   return {
-    id: chore.id.toString(),
+    id: instance ? `${chore.id}-${instance.id}` : chore.id.toString(),
     title: chore.name,
-    start: formatDate(chore.due_date || new Date()),
+    start: instance ? instance.due_date : (chore.due_date || new Date().toISOString().split('T')[0]),
     allDay: true,
     className: `chore-${chore.frequency_id}`, // Will be used for styling based on frequency
     extendedProps: {
-      location_id: chore.location_id,
-      assigned_to: chore.assigned_to,
-      frequency_id: chore.frequency_id,
+      choreId: chore.id,
+      instanceId: instance?.id,
+      locationId: chore.location_id,
+      assignedTo: chore.assigned_to,
+      frequencyId: chore.frequency_id,
+      isComplete: instance ? instance.is_complete : chore.is_complete,
+      lastCompleted: instance ? instance.completed_at : chore.last_completed,
+      completedBy: instance ? instance.completed_by : null
     }
   };
 };
 
-// Calculate next occurrence based on frequency
-export const calculateNextOccurrence = (currentDate, frequencyType) => {
-  const date = new Date(currentDate);
-  
-  switch (frequencyType) {
-    case 'daily':
-      date.setDate(date.getDate() + 1);
-      break;
-    case 'weekly':
-      date.setDate(date.getDate() + 7);
-      break;
-    case 'monthly':
-      date.setMonth(date.getMonth() + 1);
-      break;
-    case 'quarterly':
-      date.setMonth(date.getMonth() + 3);
-      break;
-    case 'yearly':
-      date.setFullYear(date.getFullYear() + 1);
-      break;
-    default:
-      return currentDate;
-  }
-  
-  return formatDate(date);
+// Transform chores and their instances into calendar events
+export const transformChoresToEvents = (chores) => {
+  return chores.flatMap(chore => {
+    if (chore.instances && chore.instances.length > 0) {
+      // Create events from instances
+      return chore.instances.map(instance => choreToEvent(chore, instance));
+    } else {
+      // Fallback to creating a single event from the chore itself
+      return [choreToEvent(chore)];
+    }
+  });
 };
 
 // Group events by assignee
 export const groupEventsByAssignee = (events) => {
   return events.reduce((groups, event) => {
-    const assigneeId = event.extendedProps?.assigned_to;
+    const assigneeId = event.extendedProps?.assignedTo;
     if (!groups[assigneeId]) {
       groups[assigneeId] = [];
     }

@@ -60,39 +60,69 @@ export const ChoresProvider = ({ children }) => {
     loading: allLoading,
     error: allError,
     execute: fetchAllChores
-  } = useApi(() => null, false);
+  } = useApi(getAllChores, !!(user?.role === 'ADMIN' || user?.role === 'MANAGER'));
 
-  const toggleChoreComplete = useCallback(async (choreId) => {
+  const createChore = useCallback(async (choreData) => {
+    if (!user) {
+      throw new Error('User must be logged in to create chores');
+    }
+
+    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      throw new Error('Only admins and managers can create chores');
+    }
+
+    try {
+      setError(null);
+      console.log('Creating new chore with data:', choreData);
+
+      const newChore = await choresApi.create(choreData);
+      console.log('Chore created successfully:', newChore);
+
+      // Refresh the data
+      await fetchPersonalChores();
+      await fetchAllChores();
+
+      return newChore;
+    } catch (err) {
+      console.error('Create chore error:', {
+        error: err,
+        message: err.message,
+        stack: err.stack,
+        choreData,
+        userId: user?.id
+      });
+      setError(err.message || 'Failed to create chore');
+      throw err;
+    }
+  }, [fetchPersonalChores, fetchAllChores, user]);
+
+  const toggleChoreComplete = useCallback(async (choreId, instanceId) => {
     if (!user) {
       throw new Error('User must be logged in to update chores');
     }
     
     try {
       setError(null);
-      console.log('Starting toggle for chore:', choreId);
+      console.log('Starting toggle for chore:', choreId, 'instance:', instanceId);
       
-      // First, get the current chore to check its status
-      const currentChore = await choresApi.getById(choreId);
-      console.log('Current chore data:', currentChore);
-      
-      if (!currentChore) {
-        throw new Error(`Chore not found: ${choreId}`);
-      }
+      // If we have an instance ID, use the instance-specific endpoint
+      if (instanceId) {
+        await choresApi.toggleComplete(choreId, instanceId);
+      } else {
+        // Legacy behavior for chores without instances
+        const currentChore = await choresApi.getById(choreId);
+        console.log('Current chore data:', currentChore);
+        
+        if (!currentChore) {
+          throw new Error(`Chore not found: ${choreId}`);
+        }
 
-      if (currentChore.assigned_to !== user.id && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
-        throw new Error('You can only complete chores assigned to you');
+        if (currentChore.assigned_to !== user.id && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+          throw new Error('You can only complete chores assigned to you');
+        }
+        
+        await choresApi.toggleComplete(choreId);
       }
-      
-      // Toggle the completion status
-      const newStatus = !currentChore.is_complete;
-      console.log('Updating chore status to:', newStatus);
-      
-      // Update the chore
-      await choresApi.update(choreId, {
-        ...currentChore,
-        is_complete: newStatus,
-        last_completed: newStatus ? new Date().toISOString() : null
-      });
       
       console.log('Update successful, refreshing data...');
       
@@ -112,6 +142,7 @@ export const ChoresProvider = ({ children }) => {
         status: err.status,
         data: err.data,
         choreId,
+        instanceId,
         userId: user?.id
       });
       setError(err.message || 'Failed to update chore');
@@ -127,6 +158,7 @@ export const ChoresProvider = ({ children }) => {
     canManageChores: user?.role === 'ADMIN' || user?.role === 'MANAGER',
     error: error || personalError || allError,
     toggleChoreComplete,
+    createChore,
     refreshPersonalChores: fetchPersonalChores,
     refreshAllChores: fetchAllChores
   };

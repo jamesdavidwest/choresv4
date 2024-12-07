@@ -110,8 +110,6 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
   }
 };
 
-// Previous auth, users, and locations exports remain the same...
-
 export const chores = {
   getAll: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
@@ -128,9 +126,27 @@ export const chores = {
   },
 
   create: (choreData) => {
+    // Validate required fields
     if (!choreData.name || !choreData.frequency_id || !choreData.location_id) {
       throw new ApiError('Name, frequency, and location are required', 400, null, 'chores.create');
     }
+
+    // Ensure due_time is properly formatted if provided
+    if (choreData.due_time) {
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(choreData.due_time)) {
+        throw new ApiError('Invalid time format. Use HH:mm format (e.g., 09:00)', 400, null, 'chores.create');
+      }
+    }
+
+    // Ensure due_date is properly formatted if provided
+    if (choreData.due_date) {
+      const dateObj = new Date(choreData.due_date);
+      if (isNaN(dateObj.getTime())) {
+        throw new ApiError('Invalid date format', 400, null, 'chores.create');
+      }
+    }
+
     return fetchWithAuth('/chores', {
       method: 'POST',
       body: JSON.stringify(choreData),
@@ -170,32 +186,49 @@ export const chores = {
     }, 'chores.delete');
   },
 
-  toggleComplete: async (id) => {
-    if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.toggleComplete');
+  toggleComplete: async (choreId, instanceId) => {
+    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.toggleComplete');
     
     try {
-      // Get current chore state
-      const currentChore = await fetchWithAuth(`/chores/${id}`, {}, 'chores.toggleComplete.get');
-      
-      if (!currentChore) {
-        throw new ApiError('Chore not found', 404, null, 'chores.toggleComplete');
+      if (instanceId) {
+        // Get current instance state
+        const response = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
+        const instance = response.instances?.find(i => i.id === instanceId);
+        
+        if (!instance) {
+          throw new ApiError('Chore instance not found', 404, null, 'chores.toggleComplete');
+        }
+
+        // Update the instance
+        return await fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            is_complete: !instance.is_complete
+          }),
+        }, 'chores.toggleComplete.instance');
+      } else {
+        // Legacy behavior for chores without instances
+        const currentChore = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
+        
+        if (!currentChore) {
+          throw new ApiError('Chore not found', 404, null, 'chores.toggleComplete');
+        }
+
+        const updatedChore = {
+          ...currentChore,
+          is_complete: !currentChore.is_complete,
+          last_completed: !currentChore.is_complete ? new Date().toISOString() : null
+        };
+
+        return await fetchWithAuth(`/chores/${choreId}`, {
+          method: 'PUT',
+          body: JSON.stringify(updatedChore),
+        }, 'chores.toggleComplete.update');
       }
-
-      // Toggle the completion status
-      const updatedChore = {
-        ...currentChore,
-        is_complete: !currentChore.is_complete,
-        last_completed: !currentChore.is_complete ? new Date().toISOString() : null
-      };
-
-      // Perform the update
-      return await fetchWithAuth(`/chores/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updatedChore),
-      }, 'chores.toggleComplete.update');
     } catch (error) {
       console.error('Toggle complete error:', {
-        id,
+        choreId,
+        instanceId,
         error: error.message,
         stack: error.stack
       });
@@ -212,6 +245,35 @@ export const chores = {
       body: JSON.stringify({ updates }),
     }, 'chores.batchUpdate');
   },
+
+  // Instance-specific methods
+  getInstance: (choreId, instanceId) => {
+    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.getInstance');
+    if (!instanceId) throw new ApiError('Instance ID is required', 400, null, 'chores.getInstance');
+    
+    return fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {}, 'chores.getInstance');
+  },
+
+  getInstances: (choreId, params = {}) => {
+    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.getInstances');
+    
+    const queryString = new URLSearchParams(params).toString();
+    return fetchWithAuth(
+      `/chores/${choreId}/instances${queryString ? `?${queryString}` : ''}`,
+      {},
+      'chores.getInstances'
+    );
+  },
+
+  updateInstance: (choreId, instanceId, updates) => {
+    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.updateInstance');
+    if (!instanceId) throw new ApiError('Instance ID is required', 400, null, 'chores.updateInstance');
+    
+    return fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    }, 'chores.updateInstance');
+  }
 };
 
 export const auth = {

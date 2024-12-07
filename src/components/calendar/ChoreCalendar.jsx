@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -15,29 +15,34 @@ const ChoreCalendar = ({ chores }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('view');
   const [events, setEvents] = useState([]);
+  const [selectedInstance, setSelectedInstance] = useState(null);
 
   // Update events when chores change
   useEffect(() => {
-    const newEvents = transformChoresToEvents(chores, new Date(), null);
+    const newEvents = transformChoresToEvents(chores);
     setEvents(newEvents);
     console.log('Calendar events updated:', newEvents);
   }, [chores]);
 
   const handleEventClick = useCallback((clickInfo) => {
-    const { choreId } = clickInfo.event.extendedProps;
+    const { choreId, instanceId } = clickInfo.event.extendedProps;
     const chore = chores.find(c => c.id === choreId);
     
     if (chore) {
       setSelectedChore(chore);
       setSelectedDate(clickInfo.event.start.toISOString());
+      const instance = instanceId ? 
+        chore.instances?.find(i => i.id === instanceId) : 
+        null;
+      setSelectedInstance(instance);
       setModalMode('view');
       setIsModalOpen(true);
     }
   }, [chores]);
 
-  const handleToggleComplete = useCallback(async (choreId) => {
+  const handleToggleComplete = useCallback(async (choreId, instanceId) => {
     try {
-      await toggleChoreComplete(choreId);
+      await toggleChoreComplete(choreId, instanceId);
       
       // Refresh both personal and all chores as needed
       await refreshPersonalChores();
@@ -47,6 +52,7 @@ const ChoreCalendar = ({ chores }) => {
       
       setIsModalOpen(false);
       setSelectedChore(null);
+      setSelectedInstance(null);
       setModalMode('view');
 
     } catch (error) {
@@ -82,6 +88,7 @@ const ChoreCalendar = ({ chores }) => {
     setIsModalOpen(false);
     setSelectedChore(null);
     setSelectedDate(null);
+    setSelectedInstance(null);
     setModalMode('view');
   }, []);
 
@@ -162,6 +169,7 @@ const ChoreCalendar = ({ chores }) => {
         onSave={handleCreateChore}
         currentDate={selectedDate}
         mode={modalMode}
+        selectedInstance={selectedInstance}
       />
     </div>
   );
@@ -175,7 +183,15 @@ ChoreCalendar.propTypes = {
     location_id: PropTypes.number,
     assigned_to: PropTypes.number,
     is_complete: PropTypes.bool,
-    notes: PropTypes.string
+    notes: PropTypes.string,
+    instances: PropTypes.arrayOf(PropTypes.shape({
+      id: PropTypes.number,
+      chore_id: PropTypes.number,
+      due_date: PropTypes.string,
+      is_complete: PropTypes.bool,
+      completed_at: PropTypes.string,
+      completed_by: PropTypes.number
+    }))
   })).isRequired
 };
 
