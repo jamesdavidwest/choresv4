@@ -1,21 +1,47 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { format } from 'date-fns';
-import { 
-  FREQUENCY_NAMES, 
-  LOCATION_NAMES, 
-  USERS, 
-  DEFAULT_TIME, 
-  defaultChore 
-} from '../../constants/choreConstants';
 
-// Loading spinner component to avoid duplication
-const LoadingSpinner = () => (
-  <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-  </svg>
-);
+const FREQUENCY_NAMES = {
+  1: 'Daily',
+  2: 'Weekly',
+  3: 'Monthly',
+  4: 'Quarterly',
+  5: 'Yearly',
+  6: "Once"
+};
+
+const LOCATION_NAMES = {
+  1: 'Kitchen',
+  2: 'Bathroom',
+  3: 'Living Room',
+  4: 'Bedroom',
+  5: 'Hallway',
+  6: 'Den',
+  7: 'House',
+  8: 'Yard'
+};
+
+const USERS = {
+  1: { name: 'David', role: 'ADMIN' },
+  2: { name: 'Angela', role: 'MANAGER' },
+  3: { name: 'Dodie', role: 'MANAGER' },
+  4: { name: 'Sadie', role: 'USER' },
+  5: { name: 'Sami', role: 'USER' }
+};
+
+const DEFAULT_TIME = '21:00'; // 9:00 PM
+
+const defaultChore = {
+  name: '',
+  frequency_id: 1,
+  location_id: 1,
+  notes: '',
+  is_complete: false,
+  due_date: format(new Date(), 'yyyy-MM-dd'),
+  due_time: DEFAULT_TIME
+  // No default assigned_to - will be set by calendar component
+};
 
 const ChoreModal = ({
   isOpen,
@@ -25,7 +51,8 @@ const ChoreModal = ({
   onSave,
   currentDate,
   mode = 'view',
-  selectedInstance = null
+  selectedInstance = null,
+  selectedUserId // New prop for selected user
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,20 +60,15 @@ const ChoreModal = ({
 
   useEffect(() => {
     if (mode === 'view' && chore) {
-      setFormData({
-        ...defaultChore,  // Always include defaults
-        ...chore,         // Overlay with actual values
-        due_date: chore.due_date || format(new Date(), 'yyyy-MM-dd'),
-        due_time: chore.due_time || DEFAULT_TIME
-      });
+      setFormData(chore);
     } else if (mode === 'create') {
       setFormData({ 
         ...defaultChore, 
         due_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
-        due_time: DEFAULT_TIME
+        assigned_to: selectedUserId // Set assigned_to from prop
       });
     }
-  }, [mode, chore, currentDate]);
+  }, [mode, chore, currentDate, selectedUserId]);
 
   if (!isOpen) return null;
   if (mode === 'view' && !chore) return null;
@@ -89,7 +111,7 @@ const ChoreModal = ({
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'frequency_id' || name === 'location_id' ? parseInt(value, 10) : value
+      [name]: name === 'frequency_id' || name === 'location_id' || name === 'assigned_to' ? parseInt(value, 10) : value
     }));
   };
 
@@ -131,6 +153,13 @@ const ChoreModal = ({
               <h4 className="text-sm font-medium text-gray-400">Location</h4>
               <p className="mt-1 text-white">{LOCATION_NAMES[chore.location_id] || 'Unknown'}</p>
             </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium text-gray-400">Assigned To</h4>
+            <p className="mt-1 text-white">
+              {USERS[chore.assigned_to]?.name || 'Unassigned'}
+            </p>
           </div>
 
           <div>
@@ -192,7 +221,10 @@ const ChoreModal = ({
           >
             {isLoading ? (
               <span className="flex items-center space-x-2">
-                <LoadingSpinner />
+                <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 <span>{isComplete ? 'Marking incomplete...' : 'Marking complete...'}</span>
               </span>
             ) : (
@@ -303,6 +335,23 @@ const ChoreModal = ({
             />
           </label>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-400">
+            Assigned To
+            <select
+              name="assigned_to"
+              value={formData.assigned_to || selectedUserId}
+              onChange={handleInputChange}
+              required
+              className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              {Object.entries(USERS).map(([id, user]) => (
+                <option key={id} value={id}>{user.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="mt-6 flex justify-end space-x-3">
@@ -321,7 +370,10 @@ const ChoreModal = ({
         >
           {isLoading ? (
             <span className="flex items-center space-x-2">
-              <LoadingSpinner />
+              <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
               <span>Creating...</span>
             </span>
           ) : (
@@ -365,15 +417,7 @@ ChoreModal.propTypes = {
     due_date: PropTypes.string,
     due_time: PropTypes.string,
     last_completed: PropTypes.string,
-    assigned_to: PropTypes.number,
-    instances: PropTypes.arrayOf(PropTypes.shape({
-      id: PropTypes.number.isRequired,
-      chore_id: PropTypes.number.isRequired,
-      due_date: PropTypes.string.isRequired,
-      is_complete: PropTypes.bool.isRequired,
-      completed_at: PropTypes.string,
-      completed_by: PropTypes.number
-    }))
+    assigned_to: PropTypes.number
   }),
   onToggleComplete: PropTypes.func.isRequired,
   onSave: PropTypes.func.isRequired,
@@ -386,7 +430,8 @@ ChoreModal.propTypes = {
     is_complete: PropTypes.bool.isRequired,
     completed_at: PropTypes.string,
     completed_by: PropTypes.number
-  })
+  }),
+  selectedUserId: PropTypes.number  // New prop type for selected user
 };
 
 export default ChoreModal;

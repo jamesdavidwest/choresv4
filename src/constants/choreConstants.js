@@ -37,5 +37,6 @@ export const defaultChore = {
   notes: '',
   is_complete: false,
   due_date: format(new Date(), 'yyyy-MM-dd'),
-  due_time: DEFAULT_TIME
+  due_time: DEFAULT_TIME,
+  assigned_to: 1  // Default to first user
 };
