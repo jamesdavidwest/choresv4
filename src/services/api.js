@@ -41,19 +41,23 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
       ...options.headers,
     };
 
-    console.log(`API Request: ${endpoint}`, {
-      method: options.method || 'GET',
-      headers: { ...headers, Authorization: token ? 'Bearer [REDACTED]' : undefined }
-    });
-
-    const response = await fetchWithTimeout(`${API_URL}${endpoint}`, {
+    const requestOptions = {
       ...options,
       headers,
+    };
+
+    console.log(`API Request: ${endpoint}`, {
+      method: options.method || 'GET',
+      headers: { ...headers, Authorization: token ? 'Bearer [REDACTED]' : undefined },
+      body: options.body ? JSON.parse(options.body) : undefined
     });
+
+    const response = await fetchWithTimeout(`${API_URL}${endpoint}`, requestOptions);
 
     console.log(`API Response: ${endpoint}`, {
       status: response.status,
-      statusText: response.statusText
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
     });
 
     if (response.status === 401) {
@@ -84,13 +88,9 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
       return null;
     }
 
-    try {
-      const data = await response.json();
-      console.log(`API Data: ${endpoint}`, data);
-      return data;
-    } catch (e) {
-      throw new ApiError('Invalid response from server', 500, null, functionName);
-    }
+    const data = await response.json();
+    console.log(`API Data: ${endpoint}`, data);
+    return data;
   } catch (error) {
     console.error(`API Error in ${functionName}:`, {
       message: error.message,
@@ -110,37 +110,15 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
   }
 };
 
-export const calendar = {
-  getEvents: (startDate, endDate) => {
-    const params = new URLSearchParams({
-      start: startDate,
-      end: endDate
-    });
-    return fetchWithAuth(`/calendar/events?${params}`, {}, 'calendar.getEvents');
-  },
-  
-  completeChore: (choreId, instanceId, userId) => {
-    return fetchWithAuth(`/calendar/complete/${choreId}`, {
-      method: 'POST',
-      body: JSON.stringify({ instanceId, userId }),
-    }, 'calendar.completeChore');
-  },
-  
-  rescheduleChore: (choreId, date, time) => {
-    return fetchWithAuth(`/calendar/reschedule/${choreId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ date, time }),
-    }, 'calendar.rescheduleChore');
-  },
-};
-
 export const chores = {
   getAll: (params = {}) => {
+    console.log('API getAll - params:', params);
     const queryParams = { ...params };
     if (queryParams.userId) {
       queryParams.userId = parseInt(queryParams.userId, 10);
     }
     const queryString = new URLSearchParams(queryParams).toString();
+    console.log('API getAll - queryString:', queryString);
     return fetchWithAuth(
       `/chores${queryString ? `?${queryString}` : ''}`,
       {},
@@ -158,17 +136,11 @@ export const chores = {
       throw new ApiError('Name, frequency, and location are required', 400, null, 'chores.create');
     }
 
+    // Validate due time if provided
     if (choreData.due_time) {
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (!timeRegex.test(choreData.due_time)) {
         throw new ApiError('Invalid time format. Use HH:mm format (e.g., 09:00)', 400, null, 'chores.create');
-      }
-    }
-
-    if (choreData.due_date) {
-      const dateObj = new Date(choreData.due_date);
-      if (isNaN(dateObj.getTime())) {
-        throw new ApiError('Invalid date format', 400, null, 'chores.create');
       }
     }
 
@@ -178,28 +150,12 @@ export const chores = {
     }, 'chores.create');
   },
 
-  update: async (id, choreData) => {
+  update: (id, choreData) => {
     if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.update');
-    
-    try {
-      const existingChore = await fetchWithAuth(`/chores/${id}`, {}, 'chores.update.verify');
-      
-      if (!existingChore) {
-        throw new ApiError('Chore not found', 404, null, 'chores.update');
-      }
-
-      return await fetchWithAuth(`/chores/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(choreData),
-      }, 'chores.update');
-    } catch (error) {
-      console.error('Update chore error:', {
-        id,
-        error: error.message,
-        stack: error.stack
-      });
-      throw error;
-    }
+    return fetchWithAuth(`/chores/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(choreData),
+    }, 'chores.update');
   },
 
   delete: (id) => {
@@ -214,19 +170,14 @@ export const chores = {
     
     try {
       if (instanceId) {
-        const response = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
-        const instance = response.instances?.find(i => i.id === instanceId);
-        
-        if (!instance) {
-          throw new ApiError('Chore instance not found', 404, null, 'chores.toggleComplete');
-        }
-
-        return await fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
+        const response = await fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
           method: 'PUT',
           body: JSON.stringify({
-            is_complete: !instance.is_complete
+            is_complete: true
           }),
         }, 'chores.toggleComplete.instance');
+
+        return response;
       } else {
         const currentChore = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
         
@@ -234,15 +185,12 @@ export const chores = {
           throw new ApiError('Chore not found', 404, null, 'chores.toggleComplete');
         }
 
-        const updatedChore = {
-          ...currentChore,
-          is_complete: !currentChore.is_complete,
-          last_completed: !currentChore.is_complete ? new Date().toISOString() : null
-        };
-
         return await fetchWithAuth(`/chores/${choreId}`, {
           method: 'PUT',
-          body: JSON.stringify(updatedChore),
+          body: JSON.stringify({
+            is_complete: !currentChore.is_complete,
+            last_completed: !currentChore.is_complete ? new Date().toISOString() : null
+          }),
         }, 'chores.toggleComplete.update');
       }
     } catch (error) {
@@ -315,4 +263,5 @@ export const locations = {
   }
 };
 
+// Make sure both the class and its exports are available
 export { ApiError };

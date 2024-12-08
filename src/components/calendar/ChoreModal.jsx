@@ -38,7 +38,8 @@ const defaultChore = {
   location_id: 1,
   notes: '',
   is_complete: false,
-  due_date: format(new Date(), 'yyyy-MM-dd'),
+  start_date: format(new Date(), 'yyyy-MM-dd'),
+  end_date: format(new Date(), 'yyyy-MM-dd'),
   due_time: DEFAULT_TIME,
 };
 
@@ -55,45 +56,65 @@ const ChoreModal = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [hasEndDateBeenSet, setHasEndDateBeenSet] = useState(false);
   const [formData, setFormData] = useState(() => {
     if (mode === 'view' && chore) {
       return chore;
     }
     return {
       ...defaultChore,
-      due_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
+      start_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
+      end_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
       assigned_to: selectedUserId
     };
   });
+  
+  // Track completion state separately
+  const [isComplete, setIsComplete] = useState(
+    selectedInstance ? selectedInstance.is_complete : chore?.is_complete || false
+  );
 
   useEffect(() => {
     if (!isOpen) return;
     
     if (mode === 'view' && chore) {
       setFormData(chore);
+      setIsComplete(selectedInstance ? selectedInstance.is_complete : chore.is_complete);
     } else if (mode === 'create') {
       setFormData({
         ...defaultChore,
-        due_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
+        start_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
+        end_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
         assigned_to: selectedUserId
       });
+      setIsComplete(false);
     }
-  }, [isOpen, mode, chore, currentDate, selectedUserId]);
+    // Reset hasEndDateBeenSet when modal opens
+    setHasEndDateBeenSet(false);
+  }, [isOpen, mode, chore, currentDate, selectedUserId, selectedInstance]);
+
+  // Sync end_date with start_date in create mode when start_date changes
+  useEffect(() => {
+    if (mode === 'create' && !hasEndDateBeenSet) {
+      setFormData(prev => ({
+        ...prev,
+        end_date: prev.start_date
+      }));
+    }
+  }, [formData.start_date, mode, hasEndDateBeenSet]);
 
   if (!isOpen) return null;
   if (mode === 'view' && !chore) return null;
-
-  const formattedDate = currentDate ? format(new Date(currentDate), 'PPP') : 'Not specified';
 
   const handleToggle = async () => {
     try {
       setError(null);
       setIsLoading(true);
-      if (selectedInstance) {
-        await onToggleComplete(chore.id, selectedInstance.id);
-      } else {
-        await onToggleComplete(chore.id);
-      }
+      await onToggleComplete(chore.id, selectedInstance?.id);
+      // Update local completion state immediately
+      setIsComplete(!isComplete);
+      // Close the modal after successful completion
+      onClose();
     } catch (error) {
       console.error('Failed to toggle chore:', error);
       setError(error.message || 'Failed to update chore status');
@@ -107,6 +128,14 @@ const ChoreModal = ({
     try {
       setError(null);
       setIsLoading(true);
+
+      // Validate dates
+      const startDate = new Date(formData.start_date);
+      const endDate = new Date(formData.end_date);
+      if (endDate < startDate) {
+        throw new Error('End date cannot be before start date');
+      }
+
       await onSave(formData);
       onClose();
     } catch (error) {
@@ -119,6 +148,12 @@ const ChoreModal = ({
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Track when end_date is manually changed
+    if (name === 'end_date') {
+      setHasEndDateBeenSet(true);
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: ['frequency_id', 'location_id', 'assigned_to'].includes(name) ? parseInt(value, 10) : value
@@ -127,6 +162,7 @@ const ChoreModal = ({
 
   const handleClose = () => {
     setError(null);
+    setHasEndDateBeenSet(false);
     if (mode === 'create') {
       setFormData(defaultChore);
     }
@@ -134,15 +170,14 @@ const ChoreModal = ({
   };
 
   const renderViewMode = () => {
-    const isComplete = selectedInstance ? selectedInstance.is_complete : chore.is_complete;
-    const completedAt = selectedInstance ? selectedInstance.completed_at : chore.last_completed;
+    const completedAt = selectedInstance ? selectedInstance.completed_at : formData.last_completed;
     const completedBy = selectedInstance ? selectedInstance.completed_by : null;
 
     return (
       <>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-white">
-            {chore.name}
+            {formData.name}
           </h2>
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
             isComplete 
@@ -157,31 +192,41 @@ const ChoreModal = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h4 className="text-sm font-medium text-gray-400">Frequency</h4>
-              <p className="mt-1 text-white">{FREQUENCY_NAMES[chore.frequency_id] || 'Unknown'}</p>
+              <p className="mt-1 text-white">{FREQUENCY_NAMES[formData.frequency_id] || 'Unknown'}</p>
             </div>
             <div>
               <h4 className="text-sm font-medium text-gray-400">Location</h4>
-              <p className="mt-1 text-white">{LOCATION_NAMES[chore.location_id] || 'Unknown'}</p>
+              <p className="mt-1 text-white">{LOCATION_NAMES[formData.location_id] || 'Unknown'}</p>
             </div>
           </div>
 
           <div>
             <h4 className="text-sm font-medium text-gray-400">Assigned To</h4>
             <p className="mt-1 text-white">
-              {USERS[chore.assigned_to]?.name || 'Unassigned'}
+              {USERS[formData.assigned_to]?.name || 'Unassigned'}
             </p>
           </div>
 
-          <div>
-            <h4 className="text-sm font-medium text-gray-400">Due Date</h4>
-            <p className="mt-1 text-white">{formattedDate}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-medium text-gray-400">Start Date</h4>
+              <p className="mt-1 text-white">
+                {formData.start_date ? format(new Date(formData.start_date), 'PPP') : 'Not specified'}
+              </p>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-400">End Date</h4>
+              <p className="mt-1 text-white">
+                {formData.end_date ? format(new Date(formData.end_date), 'PPP') : 'Not specified'}
+              </p>
+            </div>
           </div>
 
-          {chore.due_time && (
+          {formData.due_time && (
             <div>
               <h4 className="text-sm font-medium text-gray-400">Due Time</h4>
               <p className="mt-1 text-white">
-                {format(new Date(`2000-01-01T${chore.due_time}`), 'h:mm a')}
+                {format(new Date(`2000-01-01T${formData.due_time}`), 'h:mm a')}
               </p>
             </div>
           )}
@@ -202,11 +247,11 @@ const ChoreModal = ({
             </div>
           )}
 
-          {chore.notes && (
+          {formData.notes && (
             <div>
               <h4 className="text-sm font-medium text-gray-400">Notes</h4>
               <p className="mt-1 text-sm text-gray-300 whitespace-pre-wrap">
-                {chore.notes}
+                {formData.notes}
               </p>
             </div>
           )}
@@ -325,11 +370,11 @@ const ChoreModal = ({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-400">
-              Due Date
+              Start Date
               <input
                 type="date"
-                name="due_date"
-                value={formData.due_date}
+                name="start_date"
+                value={formData.start_date}
                 onChange={handleInputChange}
                 required
                 className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -338,17 +383,31 @@ const ChoreModal = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-400">
-              Due Time
+              End Date
               <input
-                type="time"
-                name="due_time"
-                value={formData.due_time}
+                type="date"
+                name="end_date"
+                value={formData.end_date}
                 onChange={handleInputChange}
                 required
                 className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </label>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-400">
+            Due Time
+            <input
+              type="time"
+              name="due_time"
+              value={formData.due_time}
+              onChange={handleInputChange}
+              required
+              className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </label>
         </div>
 
         <div>
@@ -364,6 +423,12 @@ const ChoreModal = ({
           </label>
         </div>
       </div>
+
+      {error && (
+        <div className="mt-4 p-3 bg-red-900/40 border border-red-500/50 text-red-400 rounded">
+          {error}
+        </div>
+      )}
 
       <div className="mt-6 flex justify-end space-x-3">
         <button
@@ -403,11 +468,6 @@ const ChoreModal = ({
       />
       <div className="relative z-50 w-full max-w-md bg-gray-900 rounded-lg shadow-xl">
         <div className="p-6">
-          {error && (
-            <div className="mb-4 p-3 bg-red-900/40 border border-red-500/50 text-red-400 rounded">
-              {error}
-            </div>
-          )}
           {mode === 'view' ? renderViewMode() : renderCreateMode()}
         </div>
       </div>
@@ -425,7 +485,8 @@ ChoreModal.propTypes = {
     location_id: PropTypes.number.isRequired,
     notes: PropTypes.string,
     is_complete: PropTypes.bool,
-    due_date: PropTypes.string,
+    start_date: PropTypes.string,
+    end_date: PropTypes.string,
     due_time: PropTypes.string,
     last_completed: PropTypes.string,
     assigned_to: PropTypes.number

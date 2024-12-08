@@ -1,38 +1,33 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { chores } from '../services/api';
 import { transformChoresToEvents } from '../utils/calendarUtils';
 
 export const useChores = () => {
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [events, setEvents] = useState([]);
-    const previousRequest = useRef({ startStr: null, endStr: null, userId: null });
 
     const refetchEvents = useCallback(async (startStr, endStr, userId) => {
-        // Skip if nothing has changed
-        if (previousRequest.current.startStr === startStr &&
-            previousRequest.current.endStr === endStr &&
-            previousRequest.current.userId === userId) {
+        if (!startStr || !endStr) {
+            console.error('Missing date range:', { startStr, endStr });
             return;
         }
 
-        if (!startStr || !endStr) return;
+        console.log('Fetching chores with params:', { startStr, endStr, userId });
         
         try {
             setLoading(true);
-            setError(null);
-            
             const data = await chores.getAll({
                 startDate: startStr,
                 endDate: endStr,
                 userId: userId
             });
             
+            console.log('Received chores data:', data);
             const transformedEvents = transformChoresToEvents(data);
+            console.log('Transformed events:', transformedEvents);
+            
             setEvents(transformedEvents);
-
-            // Update previous request after successful fetch
-            previousRequest.current = { startStr, endStr, userId };
         } catch (err) {
             console.error('Error fetching chores:', err);
             setError(err.message);
@@ -40,17 +35,6 @@ export const useChores = () => {
             setLoading(false);
         }
     }, []);
-
-    useEffect(() => {
-        const currentDate = new Date();
-        const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-
-        refetchEvents(
-            start.toISOString().split('T')[0],
-            end.toISOString().split('T')[0]
-        );
-    }, [refetchEvents]);
 
     return { loading, error, events, refetchEvents };
 };

@@ -1,9 +1,9 @@
 import { format, parseISO } from 'date-fns';
 
 export const getEventStyle = (event) => {
-    const status = event.extendedProps?.status || 'upcoming';
+    const isComplete = event.extendedProps?.isComplete || event.extendedProps?.is_complete;
     const baseClasses = 'rounded-lg shadow-sm border-l-4 px-2 py-1';
-    const statusColor = getStatusColor(status);
+    const statusColor = isComplete ? 'bg-green-500' : 'bg-blue-500';
     return `${baseClasses} ${statusColor}`;
 };
 
@@ -42,29 +42,50 @@ export const formatEventTime = (dateStr) => {
 
 export const formatDateForApi = (date) => {
     if (!date) return null;
-    return format(typeof date === 'string' ? parseISO(date) : date, 'yyyy-MM-dd');
+    if (typeof date === 'string') {
+        // If it's already in YYYY-MM-DD format, return as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+        // Otherwise, parse and format
+        return format(parseISO(date), 'yyyy-MM-dd');
+    }
+    // If it's a Date object
+    return format(date, 'yyyy-MM-dd');
 };
 
 export const formatTimeForApi = (date) => {
     if (!date) return null;
-    return format(typeof date === 'string' ? parseISO(date) : date, 'HH:mm:ss');
+    if (typeof date === 'string') {
+        // If it's already in HH:mm format, return as is
+        if (/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(date)) return date;
+        // Otherwise, parse and format
+        return format(parseISO(date), 'HH:mm');
+    }
+    // If it's a Date object
+    return format(date, 'HH:mm');
 };
 
 export const transformEventForModal = (event) => {
     if (!event) return null;
     
+    console.log('Transforming event:', event);
+    const isInstance = event.extendedProps?.instanceId != null;
+    
     return {
         id: parseInt(event.extendedProps.choreId),
-        instanceId: parseInt(event.extendedProps.instanceId),
+        instanceId: isInstance ? parseInt(event.extendedProps.instanceId) : null,
         name: event.title,
         frequency_id: event.extendedProps.frequencyId,
         location_id: event.extendedProps.locationId,
         assigned_to: event.extendedProps.assignedTo,
-        is_complete: event.extendedProps.isComplete,
+        is_complete: isInstance 
+            ? Boolean(event.extendedProps.isComplete)
+            : Boolean(event.extendedProps.is_complete),
         completed_at: event.extendedProps.completedAt,
         completed_by: event.extendedProps.completedBy,
-        due_date: formatDateForApi(event.start),
-        due_time: formatTimeForApi(event.start),
+        last_completed: event.extendedProps.lastCompleted,
+        start_date: event.extendedProps.startDate,
+        end_date: event.extendedProps.endDate,
+        due_time: event.extendedProps.dueTime,
         notes: event.extendedProps.notes || ''
     };
 };
@@ -72,17 +93,24 @@ export const transformEventForModal = (event) => {
 export const transformChoresToEvents = (chores) => {
     if (!Array.isArray(chores)) return [];
     
+    console.log('Transforming chores to events:', chores);
+    
     return chores.flatMap(chore => {
         const baseEventProps = {
             id: chore.id.toString(),
             title: chore.name,
-            allDay: true,
+            allDay: !chore.due_time,
             className: `chore-${chore.frequency_id}`,
             extendedProps: {
                 choreId: chore.id,
                 locationId: chore.location_id,
                 assignedTo: chore.assigned_to,
-                frequencyId: chore.frequency_id
+                frequencyId: chore.frequency_id,
+                notes: chore.notes,
+                is_complete: chore.is_complete,
+                startDate: chore.start_date,
+                endDate: chore.end_date,
+                dueTime: chore.due_time
             }
         };
 
@@ -90,20 +118,22 @@ export const transformChoresToEvents = (chores) => {
             return chore.instances.map(instance => ({
                 ...baseEventProps,
                 id: `${chore.id}-${instance.id}`,
-                start: instance.due_date,
+                start: instance.due_date + (chore.due_time ? `T${chore.due_time}` : ''),
                 extendedProps: {
                     ...baseEventProps.extendedProps,
                     instanceId: instance.id,
                     isComplete: instance.is_complete,
-                    lastCompleted: instance.completed_at,
-                    completedBy: instance.completed_by
+                    completedAt: instance.completed_at,
+                    completedBy: instance.completed_by,
+                    lastCompleted: chore.last_completed
                 }
             }));
         }
 
         return [{
             ...baseEventProps,
-            start: chore.due_date,
+            start: chore.start_date + (chore.due_time ? `T${chore.due_time}` : ''),
+            end: chore.end_date + (chore.due_time ? `T${chore.due_time}` : ''),
             extendedProps: {
                 ...baseEventProps.extendedProps,
                 isComplete: chore.is_complete,
