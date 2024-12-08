@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
 
 const FREQUENCY_NAMES = {
   1: 'Daily',
@@ -39,8 +39,7 @@ const defaultChore = {
   notes: '',
   is_complete: false,
   due_date: format(new Date(), 'yyyy-MM-dd'),
-  due_time: DEFAULT_TIME
-  // No default assigned_to - will be set by calendar component
+  due_time: DEFAULT_TIME,
 };
 
 const ChoreModal = ({
@@ -52,23 +51,34 @@ const ChoreModal = ({
   currentDate,
   mode = 'view',
   selectedInstance = null,
-  selectedUserId // New prop for selected user
+  selectedUserId
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [formData, setFormData] = useState(defaultChore);
+  const [formData, setFormData] = useState(() => {
+    if (mode === 'view' && chore) {
+      return chore;
+    }
+    return {
+      ...defaultChore,
+      due_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
+      assigned_to: selectedUserId
+    };
+  });
 
   useEffect(() => {
+    if (!isOpen) return;
+    
     if (mode === 'view' && chore) {
       setFormData(chore);
     } else if (mode === 'create') {
-      setFormData({ 
-        ...defaultChore, 
+      setFormData({
+        ...defaultChore,
         due_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
-        assigned_to: selectedUserId // Set assigned_to from prop
+        assigned_to: selectedUserId
       });
     }
-  }, [mode, chore, currentDate, selectedUserId]);
+  }, [isOpen, mode, chore, currentDate, selectedUserId]);
 
   if (!isOpen) return null;
   if (mode === 'view' && !chore) return null;
@@ -111,7 +121,7 @@ const ChoreModal = ({
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'frequency_id' || name === 'location_id' || name === 'assigned_to' ? parseInt(value, 10) : value
+      [name]: ['frequency_id', 'location_id', 'assigned_to'].includes(name) ? parseInt(value, 10) : value
     }));
   };
 
@@ -294,6 +304,24 @@ const ChoreModal = ({
           </div>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-gray-400">
+            Assigned To
+            <select
+              name="assigned_to"
+              value={formData.assigned_to || ''}
+              onChange={handleInputChange}
+              required
+              className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              <option value="">Select User</option>
+              {Object.entries(USERS).map(([id, user]) => (
+                <option key={id} value={id}>{user.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-400">
@@ -333,23 +361,6 @@ const ChoreModal = ({
               rows={3}
               className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-          </label>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-400">
-            Assigned To
-            <select
-              name="assigned_to"
-              value={formData.assigned_to || selectedUserId}
-              onChange={handleInputChange}
-              required
-              className="mt-1 block w-full rounded-md bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-              {Object.entries(USERS).map(([id, user]) => (
-                <option key={id} value={id}>{user.name}</option>
-              ))}
-            </select>
           </label>
         </div>
       </div>
@@ -431,7 +442,7 @@ ChoreModal.propTypes = {
     completed_at: PropTypes.string,
     completed_by: PropTypes.number
   }),
-  selectedUserId: PropTypes.number  // New prop type for selected user
+  selectedUserId: PropTypes.number
 };
 
 export default ChoreModal;

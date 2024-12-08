@@ -110,9 +110,37 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
   }
 };
 
+export const calendar = {
+  getEvents: (startDate, endDate) => {
+    const params = new URLSearchParams({
+      start: startDate,
+      end: endDate
+    });
+    return fetchWithAuth(`/calendar/events?${params}`, {}, 'calendar.getEvents');
+  },
+  
+  completeChore: (choreId, instanceId, userId) => {
+    return fetchWithAuth(`/calendar/complete/${choreId}`, {
+      method: 'POST',
+      body: JSON.stringify({ instanceId, userId }),
+    }, 'calendar.completeChore');
+  },
+  
+  rescheduleChore: (choreId, date, time) => {
+    return fetchWithAuth(`/calendar/reschedule/${choreId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ date, time }),
+    }, 'calendar.rescheduleChore');
+  },
+};
+
 export const chores = {
   getAll: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
+    const queryParams = { ...params };
+    if (queryParams.userId) {
+      queryParams.userId = parseInt(queryParams.userId, 10);
+    }
+    const queryString = new URLSearchParams(queryParams).toString();
     return fetchWithAuth(
       `/chores${queryString ? `?${queryString}` : ''}`,
       {},
@@ -126,12 +154,10 @@ export const chores = {
   },
 
   create: (choreData) => {
-    // Validate required fields
     if (!choreData.name || !choreData.frequency_id || !choreData.location_id) {
       throw new ApiError('Name, frequency, and location are required', 400, null, 'chores.create');
     }
 
-    // Ensure due_time is properly formatted if provided
     if (choreData.due_time) {
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (!timeRegex.test(choreData.due_time)) {
@@ -139,7 +165,6 @@ export const chores = {
       }
     }
 
-    // Ensure due_date is properly formatted if provided
     if (choreData.due_date) {
       const dateObj = new Date(choreData.due_date);
       if (isNaN(dateObj.getTime())) {
@@ -157,14 +182,12 @@ export const chores = {
     if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.update');
     
     try {
-      // First verify the chore exists
       const existingChore = await fetchWithAuth(`/chores/${id}`, {}, 'chores.update.verify');
       
       if (!existingChore) {
         throw new ApiError('Chore not found', 404, null, 'chores.update');
       }
 
-      // Then perform the update
       return await fetchWithAuth(`/chores/${id}`, {
         method: 'PUT',
         body: JSON.stringify(choreData),
@@ -191,7 +214,6 @@ export const chores = {
     
     try {
       if (instanceId) {
-        // Get current instance state
         const response = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
         const instance = response.instances?.find(i => i.id === instanceId);
         
@@ -199,7 +221,6 @@ export const chores = {
           throw new ApiError('Chore instance not found', 404, null, 'chores.toggleComplete');
         }
 
-        // Update the instance
         return await fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -207,7 +228,6 @@ export const chores = {
           }),
         }, 'chores.toggleComplete.instance');
       } else {
-        // Legacy behavior for chores without instances
         const currentChore = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
         
         if (!currentChore) {
@@ -234,45 +254,6 @@ export const chores = {
       });
       throw error;
     }
-  },
-
-  batchUpdate: (updates) => {
-    if (!Array.isArray(updates) || !updates.length) {
-      throw new ApiError('Updates array is required', 400, null, 'chores.batchUpdate');
-    }
-    return fetchWithAuth('/chores/batch', {
-      method: 'PUT',
-      body: JSON.stringify({ updates }),
-    }, 'chores.batchUpdate');
-  },
-
-  // Instance-specific methods
-  getInstance: (choreId, instanceId) => {
-    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.getInstance');
-    if (!instanceId) throw new ApiError('Instance ID is required', 400, null, 'chores.getInstance');
-    
-    return fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {}, 'chores.getInstance');
-  },
-
-  getInstances: (choreId, params = {}) => {
-    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.getInstances');
-    
-    const queryString = new URLSearchParams(params).toString();
-    return fetchWithAuth(
-      `/chores/${choreId}/instances${queryString ? `?${queryString}` : ''}`,
-      {},
-      'chores.getInstances'
-    );
-  },
-
-  updateInstance: (choreId, instanceId, updates) => {
-    if (!choreId) throw new ApiError('Chore ID is required', 400, null, 'chores.updateInstance');
-    if (!instanceId) throw new ApiError('Instance ID is required', 400, null, 'chores.updateInstance');
-    
-    return fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    }, 'chores.updateInstance');
   }
 };
 
