@@ -18,16 +18,14 @@ const USERS = {
     5: { name: 'Sami', role: 'USER' }
 };
 
-// Transform USERS object into array format for Dropdown
 const USER_OPTIONS = [
-    { id: 0, name: 'All' },  // Changed from empty string to 0
+    { id: 0, name: 'All' },
     ...Object.entries(USERS).map(([id, userData]) => ({
         id: parseInt(id),
         name: userData.name
     }))
 ];
 
-// Helper function to get current month's date range
 const getCurrentMonthRange = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -54,7 +52,6 @@ const ChoreCalendar = () => {
         const event = transformEventForModal(clickInfo.event);
         setSelectedEvent(event);
         
-        // If this is an instance-specific event, create the instance object
         if (event.instanceId) {
             setSelectedInstance({
                 id: event.instanceId,
@@ -98,7 +95,6 @@ const ChoreCalendar = () => {
             await refetchEvents(startStr, endStr, selectedUserId === 0 ? null : selectedUserId);
         } catch (err) {
             console.error('Error in handleDatesSet:', err);
-            // On error, fall back to current month
             const currentRange = getCurrentMonthRange();
             setCurrentViewDates(currentRange);
             await refetchEvents(currentRange.start, currentRange.end, selectedUserId === 0 ? null : selectedUserId);
@@ -119,8 +115,6 @@ const ChoreCalendar = () => {
             }
 
             await chores.delete(choreId);
-            
-            // Refresh events
             await refetchEvents(
                 currentViewDates.start,
                 currentViewDates.end,
@@ -136,12 +130,9 @@ const ChoreCalendar = () => {
 
     const handleChoreComplete = useCallback(async (choreId, instanceId) => {
         try {
-            // First toggle the completion status
             const result = await chores.toggleComplete(choreId, instanceId);
             
-            // Create a promise that resolves when state updates are complete
             await new Promise(resolve => {
-                // Update the selected event with the new status
                 if (instanceId) {
                     setSelectedInstance(prev => ({
                         ...prev,
@@ -156,12 +147,9 @@ const ChoreCalendar = () => {
                         last_completed: result.last_completed
                     }));
                 }
-                
-                // Use setTimeout to ensure state updates have been processed
                 setTimeout(resolve, 0);
             });
             
-            // Then refresh the events
             await refetchEvents(
                 currentViewDates.start,
                 currentViewDates.end,
@@ -178,8 +166,6 @@ const ChoreCalendar = () => {
     const handleCreateChore = useCallback(async (choreData) => {
         try {
             await chores.create(choreData);
-            
-            // After creating a chore, fetch all chores regardless of user filter
             await refetchEvents(
                 currentViewDates.start,
                 currentViewDates.end,
@@ -207,7 +193,6 @@ const ChoreCalendar = () => {
         }
     }, [refetchEvents, currentViewDates]);
 
-    // Filter events based on completion status
     const filteredEvents = events.filter(event => {
         const isComplete = event.extendedProps?.isComplete || event.extendedProps?.is_complete;
         switch (completionFilterState) {
@@ -299,15 +284,15 @@ const ChoreCalendar = () => {
                     datesSet={handleDatesSet}
                     height="100%"
                     eventContent={(eventInfo) => (
-                        <div className={getEventStyle(eventInfo.event)}>
-                            <div className="text-sm font-medium text-white">{eventInfo.event.title}</div>
-                            {eventInfo.timeText && (
-                                <div className="text-xs text-white">
-                                    {eventInfo.timeText}
-                                </div>
-                            )}
-                            <div className="text-xs text-gray-200 mt-1">
-                                {getAssigneeName(eventInfo.event.extendedProps.assignedTo)}
+                        <div className={`${getEventStyle(eventInfo.event)} w-[150px] max-w-full p-1 !h-fit !min-h-fit flex flex-col !justify-start`}>
+                            <div className="text-sm font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                                {eventInfo.event.title}
+                            </div>
+                            <div className="flex justify-between items-center text-xs text-gray-200 w-full mt-0">
+                                <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {getAssigneeName(eventInfo.event.extendedProps.assignedTo)}
+                                </span>
+                                {eventInfo.timeText && <span className="flex-shrink-0 ml-1">{eventInfo.timeText}</span>}
                             </div>
                         </div>
                     )}
