@@ -39,6 +39,37 @@
     font-style: italic;
 }
 
+/* Fix header row scrolling */
+.fc .fc-col-header {
+    width: 100% !important;
+    overflow: hidden !important;
+}
+
+.fc .fc-col-header-cell {
+    overflow: visible !important;
+}
+
+/* Modern scrollbar for calendar body only */
+.fc .fc-daygrid-body {
+    overflow: auto !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+.fc .fc-daygrid-body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.fc .fc-daygrid-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fc .fc-daygrid-body::-webkit-scrollbar-thumb {
+    background-color: rgba(155, 155, 155, 0.5);
+    border-radius: 3px;
+}
+
 /* Loading States */
 .calendar-loading {
     position: absolute;

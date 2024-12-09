@@ -3,7 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { getEventStyle, transformEventForModal } from '../../utils/calendarUtils';
+import { getEventStyle, transformEventForModal, getAssigneeName } from '../../utils/calendarUtils';
 import ChoreModal from './ChoreModal';
 import { useChores } from '../../hooks/useChores';
 import { useAuth } from '../../context/AuthContext';
@@ -112,28 +112,56 @@ const ChoreCalendar = () => {
         setSelectedDate(null);
     }, []);
 
+    const handleDeleteChore = useCallback(async (choreId) => {
+        try {
+            if (!window.confirm('Are you sure you want to delete this chore? This cannot be undone.')) {
+                return;
+            }
+
+            await chores.delete(choreId);
+            
+            // Refresh events
+            await refetchEvents(
+                currentViewDates.start,
+                currentViewDates.end,
+                selectedUserId === 0 ? null : selectedUserId
+            );
+            
+            handleCloseModal();
+        } catch (error) {
+            console.error('Error deleting chore:', error);
+            alert('Failed to delete chore: ' + error.message);
+        }
+    }, [refetchEvents, handleCloseModal, currentViewDates, selectedUserId]);
+
     const handleChoreComplete = useCallback(async (choreId, instanceId) => {
         try {
             // First toggle the completion status
             const result = await chores.toggleComplete(choreId, instanceId);
             
-            // Update the selected event with the new status
-            if (instanceId) {
-                setSelectedInstance(prev => ({
-                    ...prev,
-                    is_complete: result.is_complete,
-                    completed_at: result.completed_at,
-                    completed_by: result.completed_by
-                }));
-            } else {
-                setSelectedEvent(prev => ({
-                    ...prev,
-                    is_complete: result.is_complete,
-                    last_completed: result.last_completed
-                }));
-            }
+            // Create a promise that resolves when state updates are complete
+            await new Promise(resolve => {
+                // Update the selected event with the new status
+                if (instanceId) {
+                    setSelectedInstance(prev => ({
+                        ...prev,
+                        is_complete: result.is_complete,
+                        completed_at: result.completed_at,
+                        completed_by: result.completed_by
+                    }));
+                } else {
+                    setSelectedEvent(prev => ({
+                        ...prev,
+                        is_complete: result.is_complete,
+                        last_completed: result.last_completed
+                    }));
+                }
+                
+                // Use setTimeout to ensure state updates have been processed
+                setTimeout(resolve, 0);
+            });
             
-            // Then refresh the events in the background
+            // Then refresh the events
             await refetchEvents(
                 currentViewDates.start,
                 currentViewDates.end,
@@ -185,7 +213,7 @@ const ChoreCalendar = () => {
         switch (completionFilterState) {
             case 'completed':
                 return isComplete;
-            case 'incompleted':
+            case 'pending':
                 return !isComplete;
             default:
                 return true;
@@ -232,14 +260,14 @@ const ChoreCalendar = () => {
                         Completed
                     </button>
                     <button
-                        onClick={() => setCompletionFilterState('incompleted')}
+                        onClick={() => setCompletionFilterState('pending')}
                         className={`px-4 py-2 rounded-md focus:outline-none ${
-                            completionFilterState === 'incompleted'
+                            completionFilterState === 'pending'
                                 ? 'bg-blue-600 text-white'
                                 : 'text-gray-400 hover:bg-gray-700'
                         }`}
                     >
-                        Incompleted
+                        Pending
                     </button>
                 </div>
                 {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
@@ -272,12 +300,15 @@ const ChoreCalendar = () => {
                     height="100%"
                     eventContent={(eventInfo) => (
                         <div className={getEventStyle(eventInfo.event)}>
-                            <div className="text-sm font-medium">{eventInfo.event.title}</div>
+                            <div className="text-sm font-medium text-white">{eventInfo.event.title}</div>
                             {eventInfo.timeText && (
-                                <div className="text-xs text-gray-600">
+                                <div className="text-xs text-white">
                                     {eventInfo.timeText}
                                 </div>
                             )}
+                            <div className="text-xs text-gray-200 mt-1">
+                                {getAssigneeName(eventInfo.event.extendedProps.assignedTo)}
+                            </div>
                         </div>
                     )}
                 />
@@ -292,6 +323,8 @@ const ChoreCalendar = () => {
                     mode={modalMode}
                     selectedInstance={selectedInstance}
                     selectedUserId={selectedUserId}
+                    user={user}
+                    onDelete={() => selectedEvent?.id && handleDeleteChore(selectedEvent.id)}
                 />
             </div>
         </div>

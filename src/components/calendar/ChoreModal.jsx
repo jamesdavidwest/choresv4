@@ -52,7 +52,9 @@ const ChoreModal = ({
   currentDate,
   mode = 'view',
   selectedInstance = null,
-  selectedUserId
+  selectedUserId,
+  onDelete,
+  user
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -110,10 +112,14 @@ const ChoreModal = ({
     try {
       setError(null);
       setIsLoading(true);
+      
+      // Wait for the toggle operation to complete
       await onToggleComplete(chore.id, selectedInstance?.id);
-      // Update local completion state immediately
+      
+      // Update local completion state
       setIsComplete(!isComplete);
-      // Close the modal after successful completion
+      
+      // Only close the modal after everything is complete
       onClose();
     } catch (error) {
       console.error('Failed to toggle chore:', error);
@@ -258,6 +264,15 @@ const ChoreModal = ({
         </div>
 
         <div className="mt-6 flex justify-end space-x-3">
+          {['ADMIN', 'MANAGER'].includes(user?.role) && (
+            <button
+              onClick={onDelete}
+              disabled={isLoading}
+              className="px-4 py-2 bg-red-800/60 text-red-300 rounded-md hover:bg-red-800/80 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Delete Chore
+            </button>
+          )}
           <button
             onClick={handleClose}
             disabled={isLoading}
@@ -503,7 +518,13 @@ ChoreModal.propTypes = {
     completed_at: PropTypes.string,
     completed_by: PropTypes.number
   }),
-  selectedUserId: PropTypes.number
+  selectedUserId: PropTypes.number,
+  onDelete: PropTypes.func.isRequired,
+  user: PropTypes.shape({
+    id: PropTypes.number,
+    role: PropTypes.string,
+    name: PropTypes.string
+  }).isRequired
 };
 
 export default ChoreModal;

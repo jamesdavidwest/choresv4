@@ -1,10 +1,22 @@
 import { format, parseISO } from 'date-fns';
 
+const USERS = {
+    1: { name: 'David', role: 'ADMIN' },
+    2: { name: 'Angela', role: 'MANAGER' },
+    3: { name: 'Dodie', role: 'MANAGER' },
+    4: { name: 'Sadie', role: 'USER' },
+    5: { name: 'Sami', role: 'USER' }
+};
+
 export const getEventStyle = (event) => {
     const isComplete = event.extendedProps?.isComplete || event.extendedProps?.is_complete;
-    const baseClasses = 'rounded-lg shadow-sm border-l-4 px-2 py-1';
-    const statusColor = isComplete ? 'bg-green-500' : 'bg-blue-500';
+    const baseClasses = 'rounded-lg shadow-sm border-l-4 px-2 py-1 min-h-[4rem] flex flex-col justify-between';
+    const statusColor = isComplete ? 'bg-green-500/80' : 'bg-blue-500/80';
     return `${baseClasses} ${statusColor}`;
+};
+
+export const getAssigneeName = (assignedTo) => {
+    return USERS[assignedTo]?.name || 'Unassigned';
 };
 
 export const getStatusColor = (status) => {

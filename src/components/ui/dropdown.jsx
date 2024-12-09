@@ -20,14 +20,14 @@ export const Dropdown = ({
   const selectedOption = options.find(opt => opt.id === selectedValue) || { name: placeholder };
 
   return (
-    <div className={`relative w-full ${className}`}>
+    <div className={`relative inline-block ${className}`}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full py-2 px-4 rounded-lg font-medium transition-all duration-200 
+        className="w-full min-w-[12rem] py-2 px-4 rounded-lg font-medium transition-all duration-200 
           bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-between"
       >
-        <span>{selectedOption.name}</span>
-        <ChevronDown className="h-4 w-4 ml-2" />
+        <span className="block truncate">{selectedOption.name}</span>
+        <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
       </button>
       
       {isOpen && (
@@ -42,7 +42,7 @@ export const Dropdown = ({
                   : 'text-slate-300'
                 }`}
             >
-              {option.name}
+              <span className="block truncate">{option.name}</span>
             </button>
           ))}
         </div>

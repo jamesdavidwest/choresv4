@@ -114,9 +114,14 @@ export const chores = {
   getAll: (params = {}) => {
     console.log('API getAll - params:', params);
     const queryParams = { ...params };
-    if (queryParams.userId) {
+    
+    // Only include userId if it's not null
+    if (queryParams.userId === null || queryParams.userId === undefined) {
+      delete queryParams.userId;
+    } else {
       queryParams.userId = parseInt(queryParams.userId, 10);
     }
+    
     const queryString = new URLSearchParams(queryParams).toString();
     console.log('API getAll - queryString:', queryString);
     return fetchWithAuth(
@@ -170,10 +175,19 @@ export const chores = {
     
     try {
       if (instanceId) {
+        // First get the current instance state
+        const currentChore = await fetchWithAuth(`/chores/${choreId}`, {}, 'chores.toggleComplete.get');
+        const currentInstance = currentChore.instances?.find(i => i.id === parseInt(instanceId));
+        
+        if (!currentInstance) {
+          throw new ApiError('Instance not found', 404, null, 'chores.toggleComplete');
+        }
+
+        // Then toggle based on current state
         const response = await fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
           method: 'PUT',
           body: JSON.stringify({
-            is_complete: true
+            is_complete: !currentInstance.is_complete
           }),
         }, 'chores.toggleComplete.instance');
 
