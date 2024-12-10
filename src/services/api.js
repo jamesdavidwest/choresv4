@@ -1,5 +1,6 @@
 const API_URL = 'http://localhost:3001/api';
 const DEFAULT_TIMEOUT = 15000;
+const BATCH_SIZE = 50;
 
 class ApiError extends Error {
   constructor(message, status, data, functionName = '') {
@@ -110,8 +111,11 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = '') => {
   }
 };
 
+// Cache for batch operations
+const batchCache = new Map();
+
 export const chores = {
-  getAll: (params = {}) => {
+  getAll: async (params = {}) => {
     console.log('API getAll - params:', params);
     const queryParams = { ...params };
     
@@ -123,12 +127,27 @@ export const chores = {
     }
     
     const queryString = new URLSearchParams(queryParams).toString();
+    const cacheKey = `chores-${queryString}`;
+    
+    // Check cache first
+    if (batchCache.has(cacheKey)) {
+      return batchCache.get(cacheKey);
+    }
+    
     console.log('API getAll - queryString:', queryString);
-    return fetchWithAuth(
+    const data = await fetchWithAuth(
       `/chores${queryString ? `?${queryString}` : ''}`,
       {},
       'chores.getAll'
     );
+    
+    // Cache the result
+    batchCache.set(cacheKey, data);
+    
+    // Clear cache after 5 minutes
+    setTimeout(() => batchCache.delete(cacheKey), 300000);
+    
+    return data;
   },
 
   getById: (id) => {
@@ -136,7 +155,7 @@ export const chores = {
     return fetchWithAuth(`/chores/${id}`, {}, 'chores.getById');
   },
 
-  create: (choreData) => {
+  create: async (choreData) => {
     if (!choreData.name || !choreData.frequency_id || !choreData.location_id) {
       throw new ApiError('Name, frequency, and location are required', 400, null, 'chores.create');
     }
@@ -149,25 +168,42 @@ export const chores = {
       }
     }
 
-    return fetchWithAuth('/chores', {
+    const result = await fetchWithAuth('/chores', {
       method: 'POST',
       body: JSON.stringify(choreData),
     }, 'chores.create');
+
+    // Clear all cache entries as new chore affects all queries
+    batchCache.clear();
+
+    return result;
   },
 
-  update: (id, choreData) => {
+  update: async (id, choreData) => {
     if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.update');
-    return fetchWithAuth(`/chores/${id}`, {
+    
+    const result = await fetchWithAuth(`/chores/${id}`, {
       method: 'PUT',
       body: JSON.stringify(choreData),
     }, 'chores.update');
+
+    // Clear all cache entries as update affects all queries
+    batchCache.clear();
+
+    return result;
   },
 
-  delete: (id) => {
+  delete: async (id) => {
     if (!id) throw new ApiError('Chore ID is required', 400, null, 'chores.delete');
-    return fetchWithAuth(`/chores/${id}`, {
+    
+    const result = await fetchWithAuth(`/chores/${id}`, {
       method: 'DELETE',
     }, 'chores.delete');
+
+    // Clear all cache entries as deletion affects all queries
+    batchCache.clear();
+
+    return result;
   },
 
   toggleComplete: async (choreId, instanceId) => {
@@ -183,7 +219,31 @@ export const chores = {
           throw new ApiError('Instance not found', 404, null, 'chores.toggleComplete');
         }
 
-        // Then toggle based on current state
+        // Optimistic update in cache
+        batchCache.forEach((value, key) => {
+          if (key.startsWith('chores-')) {
+            const updatedData = value.map(chore => {
+              if (chore.id === choreId) {
+                return {
+                  ...chore,
+                  instances: chore.instances?.map(instance => {
+                    if (instance.id === parseInt(instanceId)) {
+                      return {
+                        ...instance,
+                        is_complete: !currentInstance.is_complete,
+                        completed_at: !currentInstance.is_complete ? new Date().toISOString() : null
+                      };
+                    }
+                    return instance;
+                  })
+                };
+              }
+              return chore;
+            });
+            batchCache.set(key, updatedData);
+          }
+        });
+
         const response = await fetchWithAuth(`/chores/${choreId}/instances/${instanceId}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -199,6 +259,23 @@ export const chores = {
           throw new ApiError('Chore not found', 404, null, 'chores.toggleComplete');
         }
 
+        // Optimistic update in cache
+        batchCache.forEach((value, key) => {
+          if (key.startsWith('chores-')) {
+            const updatedData = value.map(chore => {
+              if (chore.id === choreId) {
+                return {
+                  ...chore,
+                  is_complete: !currentChore.is_complete,
+                  last_completed: !currentChore.is_complete ? new Date().toISOString() : null
+                };
+              }
+              return chore;
+            });
+            batchCache.set(key, updatedData);
+          }
+        });
+
         return await fetchWithAuth(`/chores/${choreId}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -208,6 +285,9 @@ export const chores = {
         }, 'chores.toggleComplete.update');
       }
     } catch (error) {
+      // Revert optimistic updates on error
+      batchCache.clear();
+      
       console.error('Toggle complete error:', {
         choreId,
         instanceId,
@@ -216,6 +296,31 @@ export const chores = {
       });
       throw error;
     }
+  },
+
+  // New method for batch operations
+  updateBatch: async (updates) => {
+    if (!Array.isArray(updates) || updates.length === 0) {
+      throw new ApiError('Updates array is required', 400, null, 'chores.updateBatch');
+    }
+
+    const results = [];
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE);
+      const batchResults = await fetchWithAuth('/chores/batch', {
+        method: 'PUT',
+        body: JSON.stringify({ updates: batch }),
+      }, 'chores.updateBatch');
+      results.push(...batchResults);
+
+      // Allow UI to update between batches
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    // Clear cache after batch update
+    batchCache.clear();
+
+    return results;
   }
 };
 
@@ -258,6 +363,7 @@ export const auth = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    batchCache.clear();
   },
 
   isAuthenticated: () => {

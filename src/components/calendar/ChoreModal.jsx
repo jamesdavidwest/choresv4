@@ -1,36 +1,7 @@
 import PropTypes from 'prop-types';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
-
-const FREQUENCY_NAMES = {
-  1: 'Daily',
-  2: 'Weekly',
-  3: 'Monthly',
-  4: 'Quarterly',
-  5: 'Yearly',
-  6: "Once"
-};
-
-const LOCATION_NAMES = {
-  1: 'Kitchen',
-  2: 'Bathroom',
-  3: 'Living Room',
-  4: 'Bedroom',
-  5: 'Hallway',
-  6: 'Den',
-  7: 'House',
-  8: 'Yard'
-};
-
-const USERS = {
-  1: { name: 'David', role: 'ADMIN' },
-  2: { name: 'Angela', role: 'MANAGER' },
-  3: { name: 'Dodie', role: 'MANAGER' },
-  4: { name: 'Sadie', role: 'USER' },
-  5: { name: 'Sami', role: 'USER' }
-};
-
-const DEFAULT_TIME = '21:00'; // 9:00 PM
+import { FREQUENCY_NAMES, LOCATION_NAMES, USERS, DEFAULT_TIME } from '../../constants/choreConstants';
 
 const defaultChore = {
   name: '',
@@ -41,6 +12,22 @@ const defaultChore = {
   start_date: format(new Date(), 'yyyy-MM-dd'),
   end_date: format(new Date(), 'yyyy-MM-dd'),
   due_time: DEFAULT_TIME,
+};
+
+const getStatusDisplay = (status, isComplete, isSkipped) => {
+  if (isSkipped) return { text: 'Skipped', classes: 'bg-gray-500/20 text-gray-400' };
+  if (isComplete) return { text: 'Completed', classes: 'bg-green-500/20 text-green-400' };
+  
+  switch (status) {
+    case 'overdue':
+      return { text: 'Overdue', classes: 'bg-red-500/20 text-red-400' };
+    case 'pending':
+      return { text: 'Pending', classes: 'bg-yellow-500/20 text-yellow-400' };
+    case 'active':
+      return { text: 'Active', classes: 'bg-blue-500/20 text-blue-400' };
+    default:
+      return { text: 'Unknown', classes: 'bg-gray-500/20 text-gray-400' };
+  }
 };
 
 const ChoreModal = ({
@@ -91,11 +78,9 @@ const ChoreModal = ({
       });
       setIsComplete(false);
     }
-    // Reset hasEndDateBeenSet when modal opens
     setHasEndDateBeenSet(false);
   }, [isOpen, mode, chore, currentDate, selectedUserId, selectedInstance]);
 
-  // Sync end_date with start_date in create mode when start_date changes
   useEffect(() => {
     if (mode === 'create' && !hasEndDateBeenSet) {
       setFormData(prev => ({
@@ -112,14 +97,8 @@ const ChoreModal = ({
     try {
       setError(null);
       setIsLoading(true);
-      
-      // Wait for the toggle operation to complete
       await onToggleComplete(chore.id, selectedInstance?.id);
-      
-      // Update local completion state
       setIsComplete(!isComplete);
-      
-      // Only close the modal after everything is complete
       onClose();
     } catch (error) {
       console.error('Failed to toggle chore:', error);
@@ -135,7 +114,6 @@ const ChoreModal = ({
       setError(null);
       setIsLoading(true);
 
-      // Validate dates
       const startDate = new Date(formData.start_date);
       const endDate = new Date(formData.end_date);
       if (endDate < startDate) {
@@ -154,12 +132,9 @@ const ChoreModal = ({
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
-    // Track when end_date is manually changed
     if (name === 'end_date') {
       setHasEndDateBeenSet(true);
     }
-    
     setFormData(prev => ({
       ...prev,
       [name]: ['frequency_id', 'location_id', 'assigned_to'].includes(name) ? parseInt(value, 10) : value
@@ -175,9 +150,48 @@ const ChoreModal = ({
     onClose();
   };
 
+  const renderModifiedHistory = () => {
+    if (!selectedInstance?.modified_history) return null;
+    
+    let history;
+    try {
+      history = JSON.parse(selectedInstance.modified_history);
+    } catch (e) {
+      return null;
+    }
+
+    if (!Array.isArray(history) || history.length === 0) return null;
+
+    return (
+      <div className="mt-4 border-t border-gray-800 pt-4">
+        <h4 className="text-sm font-medium text-gray-400 mb-2">Modification History</h4>
+        <div className="space-y-2">
+          {history.map((entry, index) => (
+            <div key={index} className="text-sm text-gray-300">
+              <span className="text-gray-400">{format(new Date(entry.timestamp), 'PPP p')}</span>
+              <span className="mx-2">-</span>
+              <span>{entry.action}</span>
+              {entry.by && (
+                <span className="text-gray-400 ml-1">
+                  by {USERS[entry.by]?.name || `User ${entry.by}`}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderViewMode = () => {
     const completedAt = selectedInstance ? selectedInstance.completed_at : formData.last_completed;
     const completedBy = selectedInstance ? selectedInstance.completed_by : null;
+    const status = selectedInstance?.status || (isComplete ? 'completed' : 'active');
+    const statusDisplay = getStatusDisplay(
+      status,
+      isComplete,
+      selectedInstance?.skipped
+    );
 
     return (
       <>
@@ -185,12 +199,8 @@ const ChoreModal = ({
           <h2 className="text-2xl font-bold text-white">
             {formData.name}
           </h2>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            isComplete 
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-yellow-500/20 text-yellow-400'
-          }`}>
-            {isComplete ? 'Completed' : 'Pending'}
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusDisplay.classes}`}>
+            {statusDisplay.text}
           </span>
         </div>
 
@@ -261,6 +271,8 @@ const ChoreModal = ({
               </p>
             </div>
           )}
+
+          {renderModifiedHistory()}
         </div>
 
         <div className="mt-6 flex justify-end space-x-3">
@@ -280,27 +292,29 @@ const ChoreModal = ({
           >
             Close
           </button>
-          <button
-            onClick={handleToggle}
-            disabled={isLoading}
-            className={`px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              isComplete
-                ? 'bg-red-900/60 text-red-300 hover:bg-red-900/80 focus:ring-red-700'
-                : 'bg-blue-900/60 text-blue-300 hover:bg-blue-900/80 focus:ring-blue-700'
-            }`}
-          >
-            {isLoading ? (
-              <span className="flex items-center space-x-2">
-                <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>{isComplete ? 'Marking incomplete...' : 'Marking complete...'}</span>
-              </span>
-            ) : (
-              <span>{isComplete ? 'Mark Incomplete' : 'Mark Complete'}</span>
-            )}
-          </button>
+          {!selectedInstance?.skipped && (
+            <button
+              onClick={handleToggle}
+              disabled={isLoading}
+              className={`px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isComplete
+                  ? 'bg-red-900/60 text-red-300 hover:bg-red-900/80 focus:ring-red-700'
+                  : 'bg-blue-900/60 text-blue-300 hover:bg-blue-900/80 focus:ring-blue-700'
+              }`}
+            >
+              {isLoading ? (
+                <span className="flex items-center space-x-2">
+                  <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{isComplete ? 'Marking incomplete...' : 'Marking complete...'}</span>
+                </span>
+              ) : (
+                <span>{isComplete ? 'Mark Incomplete' : 'Mark Complete'}</span>
+              )}
+            </button>
+          )}
         </div>
       </>
     );
@@ -516,7 +530,12 @@ ChoreModal.propTypes = {
     due_date: PropTypes.string.isRequired,
     is_complete: PropTypes.bool.isRequired,
     completed_at: PropTypes.string,
-    completed_by: PropTypes.number
+    completed_by: PropTypes.number,
+    status: PropTypes.string,
+    skipped: PropTypes.bool,
+    modified_history: PropTypes.string,
+    start_date: PropTypes.string,
+    end_date: PropTypes.string
   }),
   selectedUserId: PropTypes.number,
   onDelete: PropTypes.func.isRequired,

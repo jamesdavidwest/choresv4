@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -9,6 +9,7 @@ import { useChores } from '../../hooks/useChores';
 import { useAuth } from '../../context/AuthContext';
 import { chores } from '../../services/api';
 import { Dropdown } from '../../components/ui/dropdown';
+import { addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
 const USERS = {
     1: { name: 'David', role: 'ADMIN' },
@@ -26,28 +27,26 @@ const USER_OPTIONS = [
     }))
 ];
 
-const getCurrentMonthRange = () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return {
-        start: start.toISOString().split('T')[0],
-        end: end.toISOString().split('T')[0]
-    };
-};
-
 const ChoreCalendar = () => {
     const { user } = useAuth();
-    const { loading, error, events, refetchEvents } = useChores();
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [selectedInstance, setSelectedInstance] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState('view');
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedUserId, setSelectedUserId] = useState(user?.id);
-    const [currentViewDates, setCurrentViewDates] = useState(getCurrentMonthRange());
     const [completionFilterState, setCompletionFilterState] = useState('all');
 
+    // Calculate extended date range for better instance handling
+    const getExtendedDateRange = useCallback((start, end) => {
+        const extendedStart = subMonths(startOfMonth(new Date(start)), 1).toISOString().split('T')[0];
+        const extendedEnd = addMonths(endOfMonth(new Date(end)), 1).toISOString().split('T')[0];
+        return { start: extendedStart, end: extendedEnd };
+    }, []);
+
+    const { loading, instanceLoading, error, events, refetchEvents, updateInstanceStatus } = useChores();
+
+    // Memoized event handlers
     const handleEventClick = useCallback((clickInfo) => {
         const event = transformEventForModal(clickInfo.event);
         setSelectedEvent(event);
@@ -85,21 +84,12 @@ const ChoreCalendar = () => {
 
     const handleDatesSet = useCallback(async (dateInfo) => {
         try {
-            const startStr = dateInfo.startStr.split('T')[0];
-            const endStr = dateInfo.endStr.split('T')[0];
-            
-            setCurrentViewDates({
-                start: startStr,
-                end: endStr
-            });
-            await refetchEvents(startStr, endStr, selectedUserId === 0 ? null : selectedUserId);
+            const { start, end } = getExtendedDateRange(dateInfo.startStr, dateInfo.endStr);
+            await refetchEvents(start, end, selectedUserId === 0 ? null : selectedUserId);
         } catch (err) {
             console.error('Error in handleDatesSet:', err);
-            const currentRange = getCurrentMonthRange();
-            setCurrentViewDates(currentRange);
-            await refetchEvents(currentRange.start, currentRange.end, selectedUserId === 0 ? null : selectedUserId);
         }
-    }, [refetchEvents, selectedUserId]);
+    }, [refetchEvents, selectedUserId, getExtendedDateRange]);
 
     const handleCloseModal = useCallback(() => {
         setIsModalOpen(false);
@@ -115,95 +105,97 @@ const ChoreCalendar = () => {
             }
 
             await chores.delete(choreId);
-            await refetchEvents(
-                currentViewDates.start,
-                currentViewDates.end,
-                selectedUserId === 0 ? null : selectedUserId
-            );
+            const currentView = window.calendar?.view;
+            if (currentView) {
+                const { start, end } = getExtendedDateRange(
+                    currentView.currentStart.toISOString(),
+                    currentView.currentEnd.toISOString()
+                );
+                await refetchEvents(start, end, selectedUserId === 0 ? null : selectedUserId);
+            }
             
             handleCloseModal();
         } catch (error) {
             console.error('Error deleting chore:', error);
             alert('Failed to delete chore: ' + error.message);
         }
-    }, [refetchEvents, handleCloseModal, currentViewDates, selectedUserId]);
+    }, [refetchEvents, handleCloseModal, selectedUserId, getExtendedDateRange]);
 
     const handleChoreComplete = useCallback(async (choreId, instanceId) => {
         try {
-            const result = await chores.toggleComplete(choreId, instanceId);
-            
-            await new Promise(resolve => {
-                if (instanceId) {
-                    setSelectedInstance(prev => ({
-                        ...prev,
-                        is_complete: result.is_complete,
-                        completed_at: result.completed_at,
-                        completed_by: result.completed_by
-                    }));
-                } else {
-                    setSelectedEvent(prev => ({
-                        ...prev,
-                        is_complete: result.is_complete,
-                        last_completed: result.last_completed
-                    }));
-                }
-                setTimeout(resolve, 0);
-            });
-            
-            await refetchEvents(
-                currentViewDates.start,
-                currentViewDates.end,
-                selectedUserId === 0 ? null : selectedUserId
-            );
-            
+            const result = await updateInstanceStatus(choreId, instanceId);
             return result;
         } catch (error) {
             console.error('Error completing chore:', error);
             throw error;
         }
-    }, [refetchEvents, selectedUserId, currentViewDates]);
+    }, [updateInstanceStatus]);
 
     const handleCreateChore = useCallback(async (choreData) => {
         try {
             await chores.create(choreData);
-            await refetchEvents(
-                currentViewDates.start,
-                currentViewDates.end,
-                selectedUserId === 0 ? null : selectedUserId
-            );
+            const currentView = window.calendar?.view;
+            if (currentView) {
+                const { start, end } = getExtendedDateRange(
+                    currentView.currentStart.toISOString(),
+                    currentView.currentEnd.toISOString()
+                );
+                await refetchEvents(start, end, selectedUserId === 0 ? null : selectedUserId);
+            }
             
             handleCloseModal();
         } catch (error) {
             console.error('Error creating chore:', error);
             throw error;
         }
-    }, [refetchEvents, handleCloseModal, currentViewDates, selectedUserId]);
+    }, [refetchEvents, handleCloseModal, selectedUserId, getExtendedDateRange]);
 
     const handleUserChange = useCallback(async (newUserId) => {
         setSelectedUserId(newUserId);
         
         try {
-            await refetchEvents(
-                currentViewDates.start,
-                currentViewDates.end,
-                newUserId === 0 ? null : newUserId
-            );
+            const currentView = window.calendar?.view;
+            if (currentView) {
+                const { start, end } = getExtendedDateRange(
+                    currentView.currentStart.toISOString(),
+                    currentView.currentEnd.toISOString()
+                );
+                await refetchEvents(start, end, newUserId === 0 ? null : newUserId);
+            }
         } catch (error) {
             console.error('Error changing user:', error);
         }
-    }, [refetchEvents, currentViewDates]);
+    }, [refetchEvents, getExtendedDateRange]);
 
-    const filteredEvents = events.filter(event => {
-        const isComplete = event.extendedProps?.isComplete || event.extendedProps?.is_complete;
-        switch (completionFilterState) {
-            case 'completed':
-                return isComplete;
-            case 'pending':
-                return !isComplete;
-            default:
-                return true;
-        }
-    });
+    // Memoized filtered events
+    const filteredEvents = useMemo(() => {
+        return events.filter(event => {
+            const isComplete = event.extendedProps?.isComplete || event.extendedProps?.is_complete;
+            switch (completionFilterState) {
+                case 'completed':
+                    return isComplete;
+                case 'pending':
+                    return !isComplete;
+                default:
+                    return true;
+            }
+        });
+    }, [events, completionFilterState]);
+
+    // Memoized event content renderer
+    const renderEventContent = useCallback((eventInfo) => (
+        <div className={`${getEventStyle(eventInfo.event)} w-[150px] max-w-full p-1 !h-fit !min-h-fit flex flex-col !justify-start`}>
+            <div className="text-sm font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                {eventInfo.event.title}
+            </div>
+            <div className="flex justify-between items-center text-xs text-gray-200 w-full mt-0">
+                <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+                    {getAssigneeName(eventInfo.event.extendedProps.assignedTo)}
+                </span>
+                {eventInfo.timeText && <span className="flex-shrink-0 ml-1">{eventInfo.timeText}</span>}
+            </div>
+        </div>
+    ), []);
 
     if (error) return <div className="text-red-500">Error: {error.message}</div>;
 
@@ -265,9 +257,11 @@ const ChoreCalendar = () => {
                 )}
             </div>
             <div className="flex-grow relative">
-                {loading && (
+                {(loading || instanceLoading) && (
                     <div className="absolute inset-0 bg-gray-900/50 z-10 flex items-center justify-center">
-                        <div className="text-white">Loading...</div>
+                        <div className="text-white bg-gray-800 rounded-lg p-4 shadow-lg">
+                            {instanceLoading ? 'Updating...' : 'Loading...'}
+                        </div>
                     </div>
                 )}
                 <FullCalendar
@@ -283,19 +277,12 @@ const ChoreCalendar = () => {
                     dateClick={handleDateClick}
                     datesSet={handleDatesSet}
                     height="100%"
-                    eventContent={(eventInfo) => (
-                        <div className={`${getEventStyle(eventInfo.event)} w-[150px] max-w-full p-1 !h-fit !min-h-fit flex flex-col !justify-start`}>
-                            <div className="text-sm font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis">
-                                {eventInfo.event.title}
-                            </div>
-                            <div className="flex justify-between items-center text-xs text-gray-200 w-full mt-0">
-                                <span className="whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {getAssigneeName(eventInfo.event.extendedProps.assignedTo)}
-                                </span>
-                                {eventInfo.timeText && <span className="flex-shrink-0 ml-1">{eventInfo.timeText}</span>}
-                            </div>
-                        </div>
-                    )}
+                    eventContent={renderEventContent}
+                    ref={calendar => {
+                        if (calendar) {
+                            window.calendar = calendar.getApi();
+                        }
+                    }}
                 />
                 
                 <ChoreModal
