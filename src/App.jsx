@@ -1,6 +1,6 @@
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { Suspense } from 'react';
-import { ChoresProvider } from './context/ChoresContext';
+import { TasksProvider } from './context/TasksContext';
 import { AuthProvider } from './context/AuthContext';
 import { router } from './routes';
 
@@ -10,12 +10,12 @@ const App = () => {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <AuthProvider>
-        <ChoresProvider>
+        <TasksProvider>
           <RouterProvider 
             router={browserRouter} 
             future={{ v7_startTransition: true }}
           />
-        </ChoresProvider>
+        </TasksProvider>
       </AuthProvider>
     </Suspense>
   );

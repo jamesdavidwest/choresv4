@@ -1,8 +1,5 @@
 // src/services/calendarService.js
-import * as axios from 'axios';
-import { choreToEvent, calculateNextOccurrence } from '../components/calendar/calendarUtils';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import { fetchWithAuth, ApiError } from './api';
 
 class CalendarService {
   constructor() {
@@ -10,129 +7,241 @@ class CalendarService {
     this.pendingRequests = new Map();
   }
 
+  // Helper method to create cache key
+  createCacheKey(start, end, userId = '') {
+    return `${start}-${end}-${userId}`;
+  }
+
   // Fetch events for a given date range
-  async getEvents(start, end) {
+  async getEvents(start, end, userId = null) {
     try {
-      const cacheKey = `${start}-${end}`;
+      const cacheKey = this.createCacheKey(start, end, userId);
       
       // Check cache first
       if (this.cache.has(cacheKey)) {
         return this.cache.get(cacheKey);
       }
 
-      // Prevent duplicate requests
+      // Check for pending requests
       if (this.pendingRequests.has(cacheKey)) {
         return this.pendingRequests.get(cacheKey);
       }
 
-      const request = axios.get(`${API_BASE_URL}/calendar/events`, {
-        params: { start, end }
-      });
+      // Create the promise for this request
+      const requestPromise = fetchWithAuth(
+        `/calendar/events?${new URLSearchParams({
+          startDate: start,
+          endDate: end,
+          ...(userId && { userId: userId })
+        })}`,
+        {},
+        'calendar.getEvents'
+      );
       
-      this.pendingRequests.set(cacheKey, request);
+      this.pendingRequests.set(cacheKey, requestPromise);
 
-      const response = await request;
-      const events = response.data.map(chore => choreToEvent(chore));
+      const response = await requestPromise;
       
       // Cache the results
-      this.cache.set(cacheKey, events);
+      this.cache.set(cacheKey, response);
       this.pendingRequests.delete(cacheKey);
 
-      return events;
+      // Clear cache after 5 minutes
+      setTimeout(() => this.cache.delete(cacheKey), 300000);
+
+      return response;
     } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      throw new Error('Failed to fetch calendar events');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to fetch calendar events', 500, error, 'calendar.getEvents');
     }
   }
 
   // Create a new event
-  async createEvent(choreData) {
+  async createEvent(eventData) {
+    if (!eventData.taskId) {
+      throw new ApiError('Task ID is required', 400, null, 'calendar.createEvent');
+    }
+
     try {
-      const response = await axios.post(`${API_BASE_URL}/calendar/events`, choreData);
-      return choreToEvent(response.data);
+      const response = await fetchWithAuth(
+        '/calendar/events',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData)
+        },
+        'calendar.createEvent'
+      );
+
+      // Clear cache as data has changed
+      this.clearCache();
+      
+      return response;
     } catch (error) {
-      console.error('Error creating calendar event:', error);
-      throw new Error('Failed to create calendar event');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to create calendar event', 500, error, 'calendar.createEvent');
     }
   }
 
   // Update an existing event
   async updateEvent(eventId, updates) {
+    if (!eventId) {
+      throw new ApiError('Event ID is required', 400, null, 'calendar.updateEvent');
+    }
+
     try {
-      const response = await axios.patch(
-        `${API_BASE_URL}/calendar/events/${eventId}`, 
-        updates
+      const response = await fetchWithAuth(
+        `/calendar/events/${eventId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates)
+        },
+        'calendar.updateEvent'
       );
-      return choreToEvent(response.data);
+
+      // Clear cache as data has changed
+      this.clearCache();
+      
+      return response;
     } catch (error) {
-      console.error('Error updating calendar event:', error);
-      throw new Error('Failed to update calendar event');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to update calendar event', 500, error, 'calendar.updateEvent');
     }
   }
 
   // Delete an event
   async deleteEvent(eventId) {
+    if (!eventId) {
+      throw new ApiError('Event ID is required', 400, null, 'calendar.deleteEvent');
+    }
+
     try {
-      await axios.delete(`${API_BASE_URL}/calendar/events/${eventId}`);
+      await fetchWithAuth(
+        `/calendar/events/${eventId}`,
+        {
+          method: 'DELETE'
+        },
+        'calendar.deleteEvent'
+      );
+
+      // Clear cache as data has changed
+      this.clearCache();
+      
       return true;
     } catch (error) {
-      console.error('Error deleting calendar event:', error);
-      throw new Error('Failed to delete calendar event');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to delete calendar event', 500, error, 'calendar.deleteEvent');
     }
   }
 
   // Mark event as completed
-  async markEventComplete(eventId, completionData) {
+  async markEventComplete(eventId, completionData = {}) {
+    if (!eventId) {
+      throw new ApiError('Event ID is required', 400, null, 'calendar.markEventComplete');
+    }
+
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/calendar/events/${eventId}/complete`,
-        completionData
+      const response = await fetchWithAuth(
+        `/calendar/events/${eventId}/complete`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(completionData)
+        },
+        'calendar.markEventComplete'
       );
-      return choreToEvent(response.data);
+
+      // Clear cache as data has changed
+      this.clearCache();
+      
+      return response;
     } catch (error) {
-      console.error('Error marking event as complete:', error);
-      throw new Error('Failed to mark event as complete');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to mark event as complete', 500, error, 'calendar.markEventComplete');
     }
   }
 
   // Get upcoming events for a specific user
   async getUpcomingEvents(userId, limit = 10) {
+    if (!userId) {
+      throw new ApiError('User ID is required', 400, null, 'calendar.getUpcomingEvents');
+    }
+
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/calendar/next-occurrences`,
-        { params: { userId, limit } }
+      return await fetchWithAuth(
+        `/calendar/next-occurrences?${new URLSearchParams({
+          userId,
+          limit: limit.toString()
+        })}`,
+        {},
+        'calendar.getUpcomingEvents'
       );
-      return response.data.map(chore => choreToEvent(chore));
     } catch (error) {
-      console.error('Error fetching upcoming events:', error);
-      throw new Error('Failed to fetch upcoming events');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to fetch upcoming events', 500, error, 'calendar.getUpcomingEvents');
     }
   }
 
-  // Clear cache for a specific range or all cache
-  clearCache(start, end) {
-    if (start && end) {
-      const cacheKey = `${start}-${end}`;
-      this.cache.delete(cacheKey);
-    } else {
-      this.cache.clear();
+  // Generate instances for a task
+  async generateInstances(taskId, startDate, endDate) {
+    if (!taskId) {
+      throw new ApiError('Task ID is required', 400, null, 'calendar.generateInstances');
+    }
+    if (!startDate || !endDate) {
+      throw new ApiError('Start and end dates are required', 400, null, 'calendar.generateInstances');
+    }
+
+    try {
+      const response = await fetchWithAuth(
+        '/calendar/generate',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            taskId,
+            startDate,
+            endDate
+          })
+        },
+        'calendar.generateInstances'
+      );
+
+      // Clear cache as new instances have been generated
+      this.clearCache();
+      
+      return response;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to generate instances', 500, error, 'calendar.generateInstances');
     }
   }
 
   // Handle event drops (rescheduling)
   async handleEventDrop(eventId, newStart, newEnd) {
+    if (!eventId || !newStart) {
+      throw new ApiError('Event ID and new start date are required', 400, null, 'calendar.handleEventDrop');
+    }
+
     try {
-      const updates = {
-        start_date: newStart,
-        end_date: newEnd || newStart
-      };
+      const response = await this.updateEvent(eventId, {
+        startDate: newStart,
+        endDate: newEnd || newStart
+      });
+
+      // Clear cache as event dates have changed
+      this.clearCache();
       
-      const response = await this.updateEvent(eventId, updates);
-      this.clearCache(); // Clear cache as dates have changed
       return response;
     } catch (error) {
-      console.error('Error handling event drop:', error);
-      throw new Error('Failed to reschedule event');
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Failed to reschedule event', 500, error, 'calendar.handleEventDrop');
+    }
+  }
+
+  // Clear cache for a specific range or all cache
+  clearCache(start = null, end = null, userId = null) {
+    if (start && end) {
+      const cacheKey = this.createCacheKey(start, end, userId);
+      this.cache.delete(cacheKey);
+    } else {
+      this.cache.clear();
     }
   }
 }

@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
@@ -10,19 +11,21 @@ import { useAuth } from './context/AuthContext';
 // Lazy load these components
 const Calendar = lazy(() => import('./pages/calendar/index.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
-const Chores = lazy(() => import('./components/chores/ChoresManagement.jsx'));
-const ChoreForm = lazy(() => import('./components/chores/ChoreForm.jsx'));
+const Tasks = lazy(() => import('./components/tasks/TasksManagement.jsx'));
+const TaskForm = lazy(() => import('./components/tasks/TasksForm.jsx'));
+
+const LoadingSpinner = () => (
+  <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+  </div>
+);
 
 // Protected Route Component
-const ProtectedRoute = ({ children }) => {
+export const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!isAuthenticated) {
@@ -32,16 +35,16 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired
+};
+
 // Admin Route Component
-const AdminRoute = ({ children }) => {
+export const AdminRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!user || user.role !== 'ADMIN') {
@@ -51,19 +54,44 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
-// Wrap lazy components with Suspense and ErrorBoundary
-const withSuspense = (Component) => (
+AdminRoute.propTypes = {
+  children: PropTypes.node.isRequired
+};
+
+// Pre-wrapped components with Suspense and ErrorBoundary
+export const SuspendedCalendar = () => (
   <ErrorBoundary>
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    }>
-      <Component />
+    <Suspense fallback={<LoadingSpinner />}>
+      <Calendar />
     </Suspense>
   </ErrorBoundary>
 );
 
+export const SuspendedDashboard = () => (
+  <ErrorBoundary>
+    <Suspense fallback={<LoadingSpinner />}>
+      <Dashboard />
+    </Suspense>
+  </ErrorBoundary>
+);
+
+export const SuspendedTasks = () => (
+  <ErrorBoundary>
+    <Suspense fallback={<LoadingSpinner />}>
+      <Tasks />
+    </Suspense>
+  </ErrorBoundary>
+);
+
+export const SuspendedTaskForm = () => (
+  <ErrorBoundary>
+    <Suspense fallback={<LoadingSpinner />}>
+      <TaskForm />
+    </Suspense>
+  </ErrorBoundary>
+);
+
+// Routes configuration
 export const router = [
   {
     path: '/',
@@ -83,23 +111,23 @@ export const router = [
       },
       {
         path: 'calendar',
-        element: <ProtectedRoute>{withSuspense(Calendar)}</ProtectedRoute>
+        element: <ProtectedRoute><SuspendedCalendar /></ProtectedRoute>
       },
       {
         path: 'dashboard',
-        element: <ProtectedRoute>{withSuspense(Dashboard)}</ProtectedRoute>
+        element: <ProtectedRoute><SuspendedDashboard /></ProtectedRoute>
       },
       {
-        path: 'chores',
-        element: <AdminRoute>{withSuspense(Chores)}</AdminRoute>
+        path: 'tasks',
+        element: <AdminRoute><SuspendedTasks /></AdminRoute>
       },
       {
-        path: 'chores/new',
-        element: <AdminRoute>{withSuspense(ChoreForm)}</AdminRoute>
+        path: 'tasks/new',
+        element: <AdminRoute><SuspendedTaskForm /></AdminRoute>
       },
       {
-        path: 'chores/edit/:id',
-        element: <AdminRoute>{withSuspense(ChoreForm)}</AdminRoute>
+        path: 'tasks/edit/:id',
+        element: <AdminRoute><SuspendedTaskForm /></AdminRoute>
       }
     ]
   }

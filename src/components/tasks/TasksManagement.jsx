@@ -5,7 +5,6 @@ import { tasks as tasksApi } from '../../services/api';
 import AdminTasksList from './AdminTasksList';
 import { Alert, AlertDescription } from '../ui/alert';
 import { X, Plus } from 'lucide-react';
-import database from '../../data/database.json';
 
 const TasksManagement = () => {
   const { user } = useAuth();
@@ -28,17 +27,8 @@ const TasksManagement = () => {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      // Map the tasks from database.json
-      setTasks(database.tasks.map(task => {
-        const location = database.locations.find(l => l.id === task.location_id);
-        const assignedUser = database.users.find(u => u.id === task.assigned_to);
-        return {
-          ...task,
-          locationName: location ? location.name : 'Unknown Location',
-          assignedUserName: assignedUser ? assignedUser.name : 'Unassigned',
-          is_complete: false // You might want to get this from another source
-        };
-      }));
+      const tasksData = await tasksApi.getAll();
+      setTasks(tasksData);
     } catch (error) {
       console.error('Error loading tasks:', error);
       setError('Failed to load tasks data. Please try again later.');
@@ -49,7 +39,8 @@ const TasksManagement = () => {
 
   const handleDelete = async (taskId) => {
     try {
-      // Filter out the deleted task immediately
+      await tasksApi.delete(taskId);
+      // Filter out the deleted task from state
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
       setSuccessMessage('Task deleted successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -62,10 +53,11 @@ const TasksManagement = () => {
 
   const handleUpdateTask = async (taskId, updates) => {
     try {
+      const updatedTask = await tasksApi.update(taskId, updates);
       // Update the task in the local state
       setTasks(prevTasks =>
         prevTasks.map(task =>
-          task.id === taskId ? { ...task, ...updates } : task
+          task.id === taskId ? { ...task, ...updatedTask } : task
         )
       );
       setSuccessMessage('Task updated successfully');

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { CheckCircle, X, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Dropdown } from '../components/ui/dropdown';
-import { useChores } from '../context/ChoresContext';
-import { useChoresStats } from '../hooks/useChoresStats';
+import { useTasks } from '../context/TasksContext';
+import { useTasksStats } from '../hooks/useTasksStats';
 import { useApi } from '../hooks/useApi';
 import { locations as locationsApi } from '../services/api';
 import QuickStats from '../components/dashboard/QuickStats';
@@ -17,12 +17,11 @@ const FREQUENCIES = {
   5: 'Yearly'
 };
 
-// Rest of the file remains exactly the same
 const Dashboard = () => {
   const { user } = useAuth();
-  const { personalChores: chores, personalLoading: isLoadingChores, error: choresError, toggleChoreComplete } = useChores();
+  const { personalTasks: tasks, personalLoading: isLoadingTasks, error: tasksError, toggleTaskComplete } = useTasks();
   const { data: locations, loading: isLoadingLocations } = useApi(locationsApi.getAll);
-  const stats = useChoresStats(chores);
+  const stats = useTasksStats(tasks);
   
   // Filter states
   const [activeFrequency, setActiveFrequency] = useState(0);
@@ -32,7 +31,7 @@ const Dashboard = () => {
   // Sorting configuration
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
-  if (isLoadingChores || isLoadingLocations) {
+  if (isLoadingTasks || isLoadingLocations) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white p-6">
         <div className="max-w-6xl mx-auto">
@@ -42,12 +41,12 @@ const Dashboard = () => {
     );
   }
 
-  if (choresError) {
+  if (tasksError) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white p-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center text-red-500">
-            Error loading chores: {choresError.message}
+            Error loading tasks: {tasksError.message}
           </div>
         </div>
       </div>
@@ -61,10 +60,10 @@ const Dashboard = () => {
     }));
   };
 
-  const handleCompleteToggle = async (choreId) => {
+  const handleCompleteToggle = async (taskId) => {
     try {
-      await toggleChoreComplete(choreId);
-      setSuccessMessage('Chore status updated successfully');
+      await toggleTaskComplete(taskId);
+      setSuccessMessage('Task status updated successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error('Toggle complete error:', error);
@@ -72,10 +71,10 @@ const Dashboard = () => {
   };
 
   // Filtering and sorting logic
-  const filteredChores = (chores || [])
-    .filter(chore => 
-      (activeFrequency === 0 || chore.frequency_id === activeFrequency) &&
-      (selectedLocation === 0 || chore.location_id === selectedLocation)
+  const filteredTasks = (tasks || [])
+    .filter(task => 
+      (activeFrequency === 0 || task.frequency_id === activeFrequency) &&
+      (selectedLocation === 0 || task.location_id === selectedLocation)
     )
     .sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -130,7 +129,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Chores Table */}
+        {/* Tasks Table */}
         <div className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800/50">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -151,12 +150,12 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredChores.map(chore => (
+                {filteredTasks.map(task => (
                   <tr 
-                    key={chore.id} 
+                    key={task.id} 
                     className={`
                       border-b border-slate-800 
-                      ${chore.is_complete 
+                      ${task.is_complete 
                         ? 'bg-green-900/20 hover:bg-green-900/30' 
                         : 'bg-slate-900/50 hover:bg-slate-800/50'
                       } 
@@ -164,40 +163,40 @@ const Dashboard = () => {
                     `}
                   >
                     <td className="p-3">
-                      {chore.is_complete ? (
+                      {task.is_complete ? (
                         <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : (
                         <X className="h-5 w-5 text-red-500" />
                       )}
                     </td>
-                    <td className={`p-3 ${chore.is_complete ? 'line-through text-slate-500' : 'text-white'}`}>
-                      {chore.name}
+                    <td className={`p-3 ${task.is_complete ? 'line-through text-slate-500' : 'text-white'}`}>
+                      {task.name}
                     </td>
                     <td className="p-3 text-slate-400">
-                      {getLocationName(chore.location_id)}
+                      {getLocationName(task.location_id)}
                     </td>
                     <td className="p-3 text-slate-400">
-                      {FREQUENCIES[chore.frequency_id]}
+                      {FREQUENCIES[task.frequency_id]}
                     </td>
                     <td className="p-3 text-slate-400">
-                      {chore.last_completed 
-                        ? new Date(chore.last_completed).toLocaleDateString()
+                      {task.last_completed 
+                        ? new Date(task.last_completed).toLocaleDateString()
                         : 'Never'
                       }
                     </td>
                     <td className="p-3">
                       <button
-                        onClick={() => handleCompleteToggle(chore.id)}
+                        onClick={() => handleCompleteToggle(task.id)}
                         className={`
                           p-2 rounded-lg transition-all duration-200 
-                          ${chore.is_complete 
+                          ${task.is_complete 
                             ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' 
                             : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
                           }
                         `}
-                        title={chore.is_complete ? 'Mark as incomplete' : 'Mark as complete'}
+                        title={task.is_complete ? 'Mark as incomplete' : 'Mark as complete'}
                       >
-                        {chore.is_complete ? <X className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                        {task.is_complete ? <X className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                       </button>
                     </td>
                   </tr>

@@ -4,6 +4,32 @@ import { USERS, STATUS_COLORS } from '../constants/taskConstants';
 // Memoization cache for expensive calculations
 const memoCache = new Map();
 
+// Simple date formatting
+export const formatDate = (date) => {
+    return new Date(date).toISOString().split('T')[0];
+};
+
+// Convert task to calendar event (simplified version)
+export const taskToEvent = (task, instance = null) => {
+    return {
+        id: instance ? `${task.id}-${instance.id}` : task.id.toString(),
+        title: task.name,
+        start: instance ? instance.due_date : (task.due_date || new Date().toISOString().split('T')[0]),
+        allDay: true,
+        className: `task-${task.frequency_id}`,
+        extendedProps: {
+            taskId: task.id,
+            instanceId: instance?.id,
+            locationId: task.location_id,
+            assignedTo: task.assigned_to,
+            frequencyId: task.frequency_id,
+            isComplete: instance ? instance.is_complete : task.is_complete,
+            lastCompleted: instance ? instance.completed_at : task.last_completed,
+            completedBy: instance ? instance.completed_by : null
+        }
+    };
+};
+
 export const getEventStyle = (event) => {
     const cacheKey = `style-${event.id}-${event.extendedProps?.status || ''}-${event.extendedProps?.skipped || false}`;
     
@@ -178,7 +204,7 @@ export const transformEventForModal = (event) => {
     const isInstance = event.extendedProps?.instanceId != null;
     
     const transformed = {
-        id: parseInt(event.extendedProps.choreId),
+        id: parseInt(event.extendedProps.taskId),
         instanceId: isInstance ? parseInt(event.extendedProps.instanceId) : null,
         name: event.title,
         frequency_id: event.extendedProps.frequencyId,
@@ -231,43 +257,43 @@ export const determineInstanceStatus = (instance, currentDate = new Date()) => {
     return status;
 };
 
-export const transformChoresToEvents = (chores) => {
-    if (!Array.isArray(chores)) return [];
+export const transformTasksToEvents = (tasks) => {
+    if (!Array.isArray(tasks)) return [];
     
     const currentDate = new Date();
-    const cacheKey = `chores-transform-${chores.length}-${currentDate.getTime()}`;
+    const cacheKey = `tasks-transform-${tasks.length}-${currentDate.getTime()}`;
     
     if (memoCache.has(cacheKey)) {
         return memoCache.get(cacheKey);
     }
     
-    const events = chores.flatMap(chore => {
+    const events = tasks.flatMap(task => {
         const baseEventProps = {
-            id: chore.id.toString(),
-            title: chore.name,
-            allDay: !chore.due_time,
-            className: `chore-${chore.frequency_id}`,
+            id: task.id.toString(),
+            title: task.name,
+            allDay: !task.due_time,
+            className: `task-${task.frequency_id}`,
             extendedProps: {
-                choreId: chore.id,
-                locationId: chore.location_id,
-                assignedTo: chore.assigned_to,
-                frequencyId: chore.frequency_id,
-                notes: chore.notes,
-                is_complete: chore.is_complete,
-                startDate: chore.start_date,
-                endDate: chore.end_date,
-                dueTime: chore.due_time
+                taskId: task.id,
+                locationId: task.location_id,
+                assignedTo: task.assigned_to,
+                frequencyId: task.frequency_id,
+                notes: task.notes,
+                is_complete: task.is_complete,
+                startDate: task.start_date,
+                endDate: task.end_date,
+                dueTime: task.due_time
             }
         };
 
-        if (chore.instances && Array.isArray(chore.instances) && chore.instances.length > 0) {
-            return chore.instances.map(instance => {
+        if (task.instances && Array.isArray(task.instances) && task.instances.length > 0) {
+            return task.instances.map(instance => {
                 const status = determineInstanceStatus(instance, currentDate);
                 
                 return {
                     ...baseEventProps,
-                    id: `${chore.id}-${instance.id}`,
-                    start: instance.due_date + (chore.due_time ? `T${chore.due_time}` : ''),
+                    id: `${task.id}-${instance.id}`,
+                    start: instance.due_date + (task.due_time ? `T${task.due_time}` : ''),
                     backgroundColor: STATUS_COLORS[status].bg,
                     borderColor: STATUS_COLORS[status].border,
                     extendedProps: {
@@ -276,7 +302,7 @@ export const transformChoresToEvents = (chores) => {
                         isComplete: instance.is_complete,
                         completedAt: instance.completed_at,
                         completedBy: instance.completed_by,
-                        lastCompleted: chore.last_completed,
+                        lastCompleted: task.last_completed,
                         status: status,
                         skipped: instance.skipped,
                         modifiedHistory: instance.modified_history,
@@ -287,18 +313,18 @@ export const transformChoresToEvents = (chores) => {
             });
         }
 
-        // Handle non-instance chores (legacy support)
-        const status = chore.is_complete ? 'completed' : 'active';
+        // Handle non-instance tasks (legacy support)
+        const status = task.is_complete ? 'completed' : 'active';
         return [{
             ...baseEventProps,
-            start: chore.start_date + (chore.due_time ? `T${chore.due_time}` : ''),
-            end: chore.end_date + (chore.due_time ? `T${chore.due_time}` : ''),
+            start: task.start_date + (task.due_time ? `T${task.due_time}` : ''),
+            end: task.end_date + (task.due_time ? `T${task.due_time}` : ''),
             backgroundColor: STATUS_COLORS[status].bg,
             borderColor: STATUS_COLORS[status].border,
             extendedProps: {
                 ...baseEventProps.extendedProps,
-                isComplete: chore.is_complete,
-                lastCompleted: chore.last_completed,
+                isComplete: task.is_complete,
+                lastCompleted: task.last_completed,
                 status: status
             }
         }];
@@ -306,6 +332,18 @@ export const transformChoresToEvents = (chores) => {
     
     memoCache.set(cacheKey, events);
     return events;
+};
+
+// Group events by assignee
+export const groupEventsByAssignee = (events) => {
+    return events.reduce((groups, event) => {
+        const assigneeId = event.extendedProps?.assignedTo;
+        if (!groups[assigneeId]) {
+            groups[assigneeId] = [];
+        }
+        groups[assigneeId].push(event);
+        return groups;
+    }, {});
 };
 
 // Clear memoization cache when needed (e.g., on significant state changes)
