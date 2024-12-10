@@ -1,13 +1,14 @@
+// src/hooks/useTasks.js
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { chores } from '../services/api';
-import { transformChoresToEvents, determineInstanceStatus } from '../utils/calendarUtils';
-import { STATUS_COLORS } from '../constants/choreConstants';
+import { tasks, calendar } from '../services/api';
+import { transformTasksToEvents, determineInstanceStatus } from '../utils/calendarUtils';
+import { STATUS_COLORS } from '../constants/taskConstants';
 import { isValid, parseISO, differenceInDays } from 'date-fns';
 
-const INSTANCE_BATCH_SIZE = 50; // Number of instances to process at once
-const PREFETCH_THRESHOLD = 7; // Days before range end to trigger prefetch
+const INSTANCE_BATCH_SIZE = 50;
+const PREFETCH_THRESHOLD = 7;
 
-export const useChores = () => {
+export const useTasks = () => {
     const [loading, setLoading] = useState(false);
     const [instanceLoading, setInstanceLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -15,7 +16,7 @@ export const useChores = () => {
     const [dateRange, setDateRange] = useState({ start: null, end: null });
     const [prefetchedRange, setPrefetchedRange] = useState({ start: null, end: null });
 
-    // Cleanup function to reset state when component unmounts
+    // Cleanup function
     useEffect(() => {
         return () => {
             setEvents([]);
@@ -90,21 +91,21 @@ export const useChores = () => {
     }, []);
 
     // Update instance status
-    const updateInstanceStatus = useCallback(async (choreId, instanceId) => {
+    const updateInstanceStatus = useCallback(async (taskId, instanceId) => {
         try {
             setInstanceLoading(true);
             setError(null);
 
-            const result = await chores.toggleComplete(choreId, instanceId);
+            const result = await tasks.toggleComplete(taskId, instanceId);
             
-            // Update local state to reflect the change
             setEvents(prevEvents => {
                 return prevEvents.map(event => {
                     if (event.extendedProps?.instanceId === instanceId) {
                         const status = determineInstanceStatus({
                             ...event,
                             is_complete: result.is_complete,
-                            skipped: result.skipped
+                            completed_at: result.completed_at,
+                            completed_by: result.completed_by
                         });
 
                         return {
@@ -113,11 +114,10 @@ export const useChores = () => {
                             borderColor: STATUS_COLORS[status].border,
                             extendedProps: {
                                 ...event.extendedProps,
-                                isComplete: result.is_complete,
-                                completedAt: result.completed_at,
-                                completedBy: result.completed_by,
-                                status: status,
-                                skipped: result.skipped
+                                is_complete: result.is_complete,
+                                completed_at: result.completed_at,
+                                completed_by: result.completed_by,
+                                status
                             }
                         };
                     }
@@ -139,30 +139,29 @@ export const useChores = () => {
         setError(null);
         
         try {
-            // Validate date range
             const { start, end } = validateDateRange(startStr, endStr);
             setDateRange({ start, end });
 
-            // Check if we need to fetch new data
             if (prefetchedRange.start && prefetchedRange.end) {
                 const prefetchStart = parseISO(prefetchedRange.start);
                 const prefetchEnd = parseISO(prefetchedRange.end);
                 
                 if (start >= prefetchStart && end <= prefetchEnd) {
-                    // Data already available
-                    return;
+                    return; // Data already available
                 }
             }
 
             setLoading(true);
-            const data = await chores.getAll({
+
+            // Use the calendar API to get instances for the date range
+            const instances = await calendar.getInstances({
                 startDate: startStr,
                 endDate: endStr,
                 userId: userId
             });
             
-            // Transform events using the utility function
-            const transformedEvents = transformChoresToEvents(data);
+            // Transform instances to calendar events
+            const transformedEvents = transformTasksToEvents(instances);
             
             // Process instances in batches
             const processedEvents = await processInstanceBatch(
@@ -175,19 +174,22 @@ export const useChores = () => {
 
             // Check if we need to prefetch more data
             if (shouldPrefetch(endStr, prefetchedRange.end)) {
-                // Trigger background prefetch
-                chores.getAll({
+                const prefetchEnd = new Date(parseISO(endStr).getTime() + 30 * 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .split('T')[0];
+
+                calendar.getInstances({
                     startDate: endStr,
-                    endDate: new Date(parseISO(endStr).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    endDate: prefetchEnd,
                     userId: userId
                 }).then(prefetchData => {
-                    const prefetchedEvents = transformChoresToEvents(prefetchData);
+                    const prefetchedEvents = transformTasksToEvents(prefetchData);
                     setEvents(prev => [...prev, ...prefetchedEvents]);
                 }).catch(console.error);
             }
         } catch (err) {
-            const errorMessage = err.message || 'Failed to fetch chores';
-            console.error('Error fetching chores:', err);
+            const errorMessage = err.message || 'Failed to fetch tasks';
+            console.error('Error fetching tasks:', err);
             setError(errorMessage);
             setEvents([]);
         } finally {
@@ -195,54 +197,17 @@ export const useChores = () => {
         }
     }, [validateDateRange, processInstanceBatch, events, prefetchedRange, shouldPrefetch]);
 
-    // Memoized event getters
+    // Get instance status
     const getInstanceStatus = useCallback((instanceId) => {
         const event = events.find(e => e.extendedProps?.instanceId === instanceId);
         if (!event) return 'pending';
         
         return event.extendedProps?.status || determineInstanceStatus({
-            is_complete: event.extendedProps?.isComplete,
-            skipped: event.extendedProps?.skipped,
+            is_complete: event.extendedProps?.is_complete,
+            completed_at: event.extendedProps?.completed_at,
             due_date: event.start
         });
     }, [events]);
-
-    // Skip instance
-    const skipInstance = useCallback(async (choreId, instanceId) => {
-        try {
-            setInstanceLoading(true);
-            setError(null);
-
-            const result = await chores.skipInstance(choreId, instanceId);
-            
-            // Update local state
-            setEvents(prevEvents => {
-                return prevEvents.map(event => {
-                    if (event.extendedProps?.instanceId === instanceId) {
-                        return {
-                            ...event,
-                            backgroundColor: STATUS_COLORS.skipped.bg,
-                            borderColor: STATUS_COLORS.skipped.border,
-                            extendedProps: {
-                                ...event.extendedProps,
-                                status: 'skipped',
-                                skipped: true
-                            }
-                        };
-                    }
-                    return event;
-                });
-            });
-
-            return result;
-        } catch (err) {
-            setError(err.message || 'Failed to skip instance');
-            console.error('Error skipping instance:', err);
-            throw err;
-        } finally {
-            setInstanceLoading(false);
-        }
-    }, []);
 
     // Memoized date range
     const currentDateRange = useMemo(() => dateRange, [dateRange]);
@@ -255,7 +220,6 @@ export const useChores = () => {
         dateRange: currentDateRange,
         refetchEvents,
         updateInstanceStatus,
-        getInstanceStatus,
-        skipInstance
+        getInstanceStatus
     };
 };

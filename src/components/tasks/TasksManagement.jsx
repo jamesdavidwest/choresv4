@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { chores as choresApi } from '../../services/api';
-import AdminChoresList from './AdminChoresList';
+import { tasks as tasksApi } from '../../services/api';
+import AdminTasksList from './AdminTasksList';
 import { Alert, AlertDescription } from '../ui/alert';
 import { X, Plus } from 'lucide-react';
 import database from '../../data/database.json';
 
-const ChoresManagement = () => {
+const TasksManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [chores, setChores] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -22,57 +22,57 @@ const ChoresManagement = () => {
       return;
     }
 
-    fetchChores();
+    fetchTasks();
   }, [user, navigate]);
 
-  const fetchChores = async () => {
+  const fetchTasks = async () => {
     try {
       setLoading(true);
-      // Map the chores from database.json
-      setChores(database.chores.map(chore => {
-        const location = database.locations.find(l => l.id === chore.location_id);
-        const assignedUser = database.users.find(u => u.id === chore.assigned_to);
+      // Map the tasks from database.json
+      setTasks(database.tasks.map(task => {
+        const location = database.locations.find(l => l.id === task.location_id);
+        const assignedUser = database.users.find(u => u.id === task.assigned_to);
         return {
-          ...chore,
+          ...task,
           locationName: location ? location.name : 'Unknown Location',
           assignedUserName: assignedUser ? assignedUser.name : 'Unassigned',
           is_complete: false // You might want to get this from another source
         };
       }));
     } catch (error) {
-      console.error('Error loading chores:', error);
-      setError('Failed to load chores data. Please try again later.');
+      console.error('Error loading tasks:', error);
+      setError('Failed to load tasks data. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (choreId) => {
+  const handleDelete = async (taskId) => {
     try {
-      // Filter out the deleted chore immediately
-      setChores(prevChores => prevChores.filter(chore => chore.id !== choreId));
-      setSuccessMessage('Chore deleted successfully');
+      // Filter out the deleted task immediately
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+      setSuccessMessage('Task deleted successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      console.error('Error deleting chore:', error);
-      setError('Failed to delete chore. Please try again.');
+      console.error('Error deleting task:', error);
+      setError('Failed to delete task. Please try again.');
       setTimeout(() => setError(null), 3000);
     }
   };
 
-  const handleUpdateChore = async (choreId, updates) => {
+  const handleUpdateTask = async (taskId, updates) => {
     try {
-      // Update the chore in the local state
-      setChores(prevChores =>
-        prevChores.map(chore =>
-          chore.id === choreId ? { ...chore, ...updates } : chore
+      // Update the task in the local state
+      setTasks(prevTasks =>
+        prevTasks.map(task =>
+          task.id === taskId ? { ...task, ...updates } : task
         )
       );
-      setSuccessMessage('Chore updated successfully');
+      setSuccessMessage('Task updated successfully');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      console.error('Error updating chore:', error);
-      setError('Failed to update chore. Please try again.');
+      console.error('Error updating task:', error);
+      setError('Failed to update task. Please try again.');
       setTimeout(() => setError(null), 3000);
     }
   };
@@ -81,7 +81,7 @@ const ChoresManagement = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 p-6">
         <div className="max-w-6xl mx-auto text-white">
-          <p className="text-slate-400">Loading chores management...</p>
+          <p className="text-slate-400">Loading tasks management...</p>
         </div>
       </div>
     );
@@ -92,14 +92,14 @@ const ChoresManagement = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-            Chores Management
+            Tasks Management
           </h1>
           <Link
-            to="/chores/new"
+            to="/tasks/new"
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
           >
             <Plus size={20} />
-            Create New Chore
+            Create New Task
           </Link>
         </div>
 
@@ -125,14 +125,14 @@ const ChoresManagement = () => {
           </Alert>
         )}
 
-        <AdminChoresList
-          chores={chores}
+        <AdminTasksList
+          tasks={tasks}
           onDelete={handleDelete}
-          onUpdateChore={handleUpdateChore}
+          onUpdateTask={handleUpdateTask}
         />
       </div>
     </div>
   );
 };
 
-export default ChoresManagement;
+export default TasksManagement;

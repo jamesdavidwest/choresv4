@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { CheckCircle, X, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Dropdown } from '../ui/dropdown';
@@ -14,7 +15,7 @@ const FREQUENCIES = {
   6: 'Once'
 };
 
-const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
+const AdminTasksList = ({ tasks, onDelete, onUpdateTask }) => {
   const { user } = useAuth();
   const [activeFrequency, setActiveFrequency] = useState(0);
   const [selectedUser, setSelectedUser] = useState(0);
@@ -45,11 +46,11 @@ const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
   };
 
   // Filtering and sorting logic
-  const filteredAndSortedChores = [...chores]
-    .filter(chore => 
-      (activeFrequency === 0 || chore.frequency_id === activeFrequency) &&
-      (selectedUser === 0 || chore.assigned_to === selectedUser) &&
-      (selectedLocation === 0 || chore.location_id === selectedLocation)
+  const filteredAndSortedTasks = [...tasks]
+    .filter(task => 
+      (activeFrequency === 0 || task.frequency_id === activeFrequency) &&
+      (selectedUser === 0 || task.assigned_to === selectedUser) &&
+      (selectedLocation === 0 || task.location_id === selectedLocation)
     )
     .sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -61,16 +62,16 @@ const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
       return 0;
     });
 
-  const handleCompleteToggle = async (choreId) => {
-    const chore = chores.find(c => c.id === choreId);
-    if (chore) {
-      onUpdateChore(choreId, { is_complete: !chore.is_complete });
+  const handleCompleteToggle = async (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      onUpdateTask(taskId, { is_complete: !task.is_complete });
     }
   };
 
-  const handleDeleteChore = async (choreId) => {
-    if (window.confirm('Are you sure you want to delete this chore?')) {
-      onDelete(choreId);
+  const handleDeleteTask = async (taskId) => {
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      onDelete(taskId);
     }
   };
 
@@ -100,7 +101,7 @@ const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
         </div>
       </div>
 
-      {/* Chores Table */}
+      {/* Tasks Table */}
       <div className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -127,12 +128,12 @@ const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredAndSortedChores.map(chore => (
+              {filteredAndSortedTasks.map(task => (
                 <tr 
-                  key={chore.id} 
+                  key={task.id} 
                   className={`
                     border-b border-slate-800 
-                    ${chore.is_complete 
+                    ${task.is_complete 
                       ? 'bg-green-900/20 hover:bg-green-900/30' 
                       : 'bg-slate-900/50 hover:bg-slate-800/50'
                     } 
@@ -140,45 +141,45 @@ const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
                   `}
                 >
                   <td className="p-3">
-                    {chore.is_complete ? (
+                    {task.is_complete ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : (
                       <X className="h-5 w-5 text-red-500" />
                     )}
                   </td>
-                  <td className={`p-3 ${chore.is_complete ? 'line-through text-slate-500' : 'text-white'}`}>
-                    {chore.name}
+                  <td className={`p-3 ${task.is_complete ? 'line-through text-slate-500' : 'text-white'}`}>
+                    {task.name}
                   </td>
                   <td className="p-3 text-slate-400">
-                    {chore.assignedUserName}
+                    {task.assignedUserName}
                   </td>
                   <td className="p-3 text-slate-400">
-                    {chore.locationName}
+                    {task.locationName}
                   </td>
                   <td className="p-3 text-slate-400">
-                    {FREQUENCIES[chore.frequency_id]}
+                    {FREQUENCIES[task.frequency_id]}
                   </td>
                   <td className="p-3 space-x-2">
                     {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
                       <button
-                        onClick={() => handleCompleteToggle(chore.id)}
+                        onClick={() => handleCompleteToggle(task.id)}
                         className={`
                           p-2 rounded-lg transition-all duration-200 
-                          ${chore.is_complete 
+                          ${task.is_complete 
                             ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' 
                             : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
                           }
                         `}
-                        title={chore.is_complete ? 'Mark as incomplete' : 'Mark as complete'}
+                        title={task.is_complete ? 'Mark as incomplete' : 'Mark as complete'}
                       >
-                        {chore.is_complete ? <X className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                        {task.is_complete ? <X className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                       </button>
                     )}
                     {user?.role === 'ADMIN' && (
                       <button
-                        onClick={() => handleDeleteChore(chore.id)}
+                        onClick={() => handleDeleteTask(task.id)}
                         className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500/30"
-                        title="Delete chore"
+                        title="Delete task"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -194,4 +195,19 @@ const AdminChoresList = ({ chores, onDelete, onUpdateChore }) => {
   );
 };
 
-export default AdminChoresList;
+AdminTasksList.propTypes = {
+  tasks: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    name: PropTypes.string.isRequired,
+    frequency_id: PropTypes.number.isRequired,
+    location_id: PropTypes.number.isRequired,
+    assigned_to: PropTypes.number.isRequired,
+    is_complete: PropTypes.bool,
+    assignedUserName: PropTypes.string,
+    locationName: PropTypes.string
+  })).isRequired,
+  onDelete: PropTypes.func.isRequired,
+  onUpdateTask: PropTypes.func.isRequired
+};
+
+export default AdminTasksList;

@@ -1,9 +1,9 @@
 import PropTypes from 'prop-types';
 import { useState } from 'react';
-import ChoresTableHeader from './ChoresTableHeader';
-import ChoresTableRow from './ChoresTableRow';
+import TasksTableHeader from './TasksTableHeader';
+import TasksTableRow from './TasksTableRow';
 
-const ChoresTable = ({ chores, locations, onToggleComplete, isLoading }) => {
+const TasksTable = ({ tasks, locations, onToggleComplete, isLoading }) => {
   const [activeFrequency, setActiveFrequency] = useState('1'); // Changed default to '1' for Daily
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   
@@ -21,8 +21,8 @@ const ChoresTable = ({ chores, locations, onToggleComplete, isLoading }) => {
     return location ? location.name : 'Unknown';
   };
 
-  const sortedChores = [...chores]
-    .filter(chore => activeFrequency === '0' || chore.frequency_id.toString() === activeFrequency)
+  const sortedTasks = [...tasks]
+    .filter(task => activeFrequency === '0' || task.frequency_id.toString() === activeFrequency)
     .sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
@@ -74,16 +74,16 @@ const ChoresTable = ({ chores, locations, onToggleComplete, isLoading }) => {
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <ChoresTableHeader 
+            <TasksTableHeader 
               onSort={handleSort}
               sortConfig={sortConfig}
             />
           </thead>
           <tbody>
-            {sortedChores.map(chore => (
-              <ChoresTableRow 
-                key={chore.id}
-                chore={chore}
+            {sortedTasks.map(task => (
+              <TasksTableRow 
+                key={task.id}
+                task={task}
                 onToggleComplete={onToggleComplete}
                 getLocationName={getLocationName}
                 frequencyTypes={frequencyTypes}
@@ -96,8 +96,8 @@ const ChoresTable = ({ chores, locations, onToggleComplete, isLoading }) => {
   );
 };
 
-ChoresTable.propTypes = {
-  chores: PropTypes.arrayOf(PropTypes.shape({
+TasksTable.propTypes = {
+  tasks: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.number.isRequired,
     name: PropTypes.string.isRequired,
     frequency_id: PropTypes.number.isRequired,
@@ -113,4 +113,4 @@ ChoresTable.propTypes = {
   isLoading: PropTypes.bool.isRequired
 };
 
-export default ChoresTable;
+export default TasksTable;

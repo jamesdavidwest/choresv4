@@ -4,11 +4,11 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { getEventStyle, transformEventForModal, getAssigneeName } from '../../utils/calendarUtils';
-import ChoreModal from './ChoreModal';
-import { useChores } from '../../hooks/useChores';
+import TaskModal from './TaskModal';
+import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../context/AuthContext';
-import { chores } from '../../services/api';
-import { Dropdown } from '../../components/ui/dropdown';
+import { tasks } from '../../services/api';
+import { Dropdown } from '../ui/dropdown';
 import { addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
 const USERS = {
@@ -27,7 +27,7 @@ const USER_OPTIONS = [
     }))
 ];
 
-const ChoreCalendar = () => {
+const TaskCalendar = () => {
     const { user } = useAuth();
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [selectedInstance, setSelectedInstance] = useState(null);
@@ -44,7 +44,7 @@ const ChoreCalendar = () => {
         return { start: extendedStart, end: extendedEnd };
     }, []);
 
-    const { loading, instanceLoading, error, events, refetchEvents, updateInstanceStatus } = useChores();
+    const { loading, instanceLoading, error, events, refetchEvents, updateInstanceStatus } = useTasks();
 
     // Memoized event handlers
     const handleEventClick = useCallback((clickInfo) => {
@@ -54,7 +54,7 @@ const ChoreCalendar = () => {
         if (event.instanceId) {
             setSelectedInstance({
                 id: event.instanceId,
-                chore_id: event.id,
+                task_id: event.id,
                 due_date: clickInfo.event.start.toISOString().split('T')[0],
                 is_complete: event.is_complete,
                 completed_at: event.completed_at,
@@ -98,13 +98,13 @@ const ChoreCalendar = () => {
         setSelectedDate(null);
     }, []);
 
-    const handleDeleteChore = useCallback(async (choreId) => {
+    const handleDeleteTask = useCallback(async (taskId) => {
         try {
-            if (!window.confirm('Are you sure you want to delete this chore? This cannot be undone.')) {
+            if (!window.confirm('Are you sure you want to delete this task? This cannot be undone.')) {
                 return;
             }
 
-            await chores.delete(choreId);
+            await tasks.delete(taskId);
             const currentView = window.calendar?.view;
             if (currentView) {
                 const { start, end } = getExtendedDateRange(
@@ -116,24 +116,24 @@ const ChoreCalendar = () => {
             
             handleCloseModal();
         } catch (error) {
-            console.error('Error deleting chore:', error);
-            alert('Failed to delete chore: ' + error.message);
+            console.error('Error deleting task:', error);
+            alert('Failed to delete task: ' + error.message);
         }
     }, [refetchEvents, handleCloseModal, selectedUserId, getExtendedDateRange]);
 
-    const handleChoreComplete = useCallback(async (choreId, instanceId) => {
+    const handleTaskComplete = useCallback(async (taskId, instanceId) => {
         try {
-            const result = await updateInstanceStatus(choreId, instanceId);
+            const result = await updateInstanceStatus(taskId, instanceId);
             return result;
         } catch (error) {
-            console.error('Error completing chore:', error);
+            console.error('Error completing task:', error);
             throw error;
         }
     }, [updateInstanceStatus]);
 
-    const handleCreateChore = useCallback(async (choreData) => {
+    const handleCreateTask = useCallback(async (taskData) => {
         try {
-            await chores.create(choreData);
+            await tasks.create(taskData);
             const currentView = window.calendar?.view;
             if (currentView) {
                 const { start, end } = getExtendedDateRange(
@@ -145,7 +145,7 @@ const ChoreCalendar = () => {
             
             handleCloseModal();
         } catch (error) {
-            console.error('Error creating chore:', error);
+            console.error('Error creating task:', error);
             throw error;
         }
     }, [refetchEvents, handleCloseModal, selectedUserId, getExtendedDateRange]);
@@ -252,7 +252,7 @@ const ChoreCalendar = () => {
                         onClick={handleCreateClick}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
-                        Create New Chore
+                        Create New Task
                     </button>
                 )}
             </div>
@@ -285,22 +285,22 @@ const ChoreCalendar = () => {
                     }}
                 />
                 
-                <ChoreModal
+                <TaskModal
                     isOpen={isModalOpen}
                     onClose={handleCloseModal}
-                    chore={selectedEvent}
-                    onToggleComplete={handleChoreComplete}
-                    onSave={handleCreateChore}
+                    task={selectedEvent}
+                    onToggleComplete={handleTaskComplete}
+                    onSave={handleCreateTask}
                     currentDate={selectedDate}
                     mode={modalMode}
                     selectedInstance={selectedInstance}
                     selectedUserId={selectedUserId}
                     user={user}
-                    onDelete={() => selectedEvent?.id && handleDeleteChore(selectedEvent.id)}
+                    onDelete={() => selectedEvent?.id && handleDeleteTask(selectedEvent.id)}
                 />
             </div>
         </div>
     );
 };
 
-export default ChoreCalendar;
+export default TaskCalendar;

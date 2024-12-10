@@ -3,36 +3,36 @@ export const formatDate = (date) => {
   return new Date(date).toISOString().split('T')[0];
 };
 
-// Convert chore to calendar event
-export const choreToEvent = (chore, instance = null) => {
+// Convert task to calendar event
+export const taskToEvent = (task, instance = null) => {
   return {
-    id: instance ? `${chore.id}-${instance.id}` : chore.id.toString(),
-    title: chore.name,
-    start: instance ? instance.due_date : (chore.due_date || new Date().toISOString().split('T')[0]),
+    id: instance ? `${task.id}-${instance.id}` : task.id.toString(),
+    title: task.name,
+    start: instance ? instance.due_date : (task.due_date || new Date().toISOString().split('T')[0]),
     allDay: true,
-    className: `chore-${chore.frequency_id}`, // Will be used for styling based on frequency
+    className: `task-${task.frequency_id}`, // Will be used for styling based on frequency
     extendedProps: {
-      choreId: chore.id,
+      taskId: task.id,
       instanceId: instance?.id,
-      locationId: chore.location_id,
-      assignedTo: chore.assigned_to,
-      frequencyId: chore.frequency_id,
-      isComplete: instance ? instance.is_complete : chore.is_complete,
-      lastCompleted: instance ? instance.completed_at : chore.last_completed,
+      locationId: task.location_id,
+      assignedTo: task.assigned_to,
+      frequencyId: task.frequency_id,
+      isComplete: instance ? instance.is_complete : task.is_complete,
+      lastCompleted: instance ? instance.completed_at : task.last_completed,
       completedBy: instance ? instance.completed_by : null
     }
   };
 };
 
-// Transform chores and their instances into calendar events
-export const transformChoresToEvents = (chores) => {
-  return chores.flatMap(chore => {
-    if (chore.instances && chore.instances.length > 0) {
+// Transform tasks and their instances into calendar events
+export const transformTasksToEvents = (tasks) => {
+  return tasks.flatMap(task => {
+    if (task.instances && task.instances.length > 0) {
       // Create events from instances
-      return chore.instances.map(instance => choreToEvent(chore, instance));
+      return task.instances.map(instance => taskToEvent(task, instance));
     } else {
-      // Fallback to creating a single event from the chore itself
-      return [choreToEvent(chore)];
+      // Fallback to creating a single event from the task itself
+      return [taskToEvent(task)];
     }
   });
 };

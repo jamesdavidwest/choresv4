@@ -1,5 +1,5 @@
 import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
-import { USERS, STATUS_COLORS } from '../constants/choreConstants';
+import { USERS, STATUS_COLORS } from '../constants/taskConstants';
 
 // Memoization cache for expensive calculations
 const memoCache = new Map();

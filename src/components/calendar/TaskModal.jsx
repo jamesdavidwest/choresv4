@@ -1,9 +1,9 @@
 import PropTypes from 'prop-types';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
-import { FREQUENCY_NAMES, LOCATION_NAMES, USERS, DEFAULT_TIME } from '../../constants/choreConstants';
+import { FREQUENCY_NAMES, LOCATION_NAMES, USERS, DEFAULT_TIME } from '../../constants/taskConstants';
 
-const defaultChore = {
+const defaultTask = {
   name: '',
   frequency_id: 1,
   location_id: 1,
@@ -30,10 +30,10 @@ const getStatusDisplay = (status, isComplete, isSkipped) => {
   }
 };
 
-const ChoreModal = ({
+const TaskModal = ({
   isOpen,
   onClose,
-  chore,
+  task,
   onToggleComplete,
   onSave,
   currentDate,
@@ -47,11 +47,11 @@ const ChoreModal = ({
   const [error, setError] = useState(null);
   const [hasEndDateBeenSet, setHasEndDateBeenSet] = useState(false);
   const [formData, setFormData] = useState(() => {
-    if (mode === 'view' && chore) {
-      return chore;
+    if (mode === 'view' && task) {
+      return task;
     }
     return {
-      ...defaultChore,
+      ...defaultTask,
       start_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
       end_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
       assigned_to: selectedUserId
@@ -60,18 +60,18 @@ const ChoreModal = ({
   
   // Track completion state separately
   const [isComplete, setIsComplete] = useState(
-    selectedInstance ? selectedInstance.is_complete : chore?.is_complete || false
+    selectedInstance ? selectedInstance.is_complete : task?.is_complete || false
   );
 
   useEffect(() => {
     if (!isOpen) return;
     
-    if (mode === 'view' && chore) {
-      setFormData(chore);
-      setIsComplete(selectedInstance ? selectedInstance.is_complete : chore.is_complete);
+    if (mode === 'view' && task) {
+      setFormData(task);
+      setIsComplete(selectedInstance ? selectedInstance.is_complete : task.is_complete);
     } else if (mode === 'create') {
       setFormData({
-        ...defaultChore,
+        ...defaultTask,
         start_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
         end_date: currentDate || format(new Date(), 'yyyy-MM-dd'),
         assigned_to: selectedUserId
@@ -79,7 +79,7 @@ const ChoreModal = ({
       setIsComplete(false);
     }
     setHasEndDateBeenSet(false);
-  }, [isOpen, mode, chore, currentDate, selectedUserId, selectedInstance]);
+  }, [isOpen, mode, task, currentDate, selectedUserId, selectedInstance]);
 
   useEffect(() => {
     if (mode === 'create' && !hasEndDateBeenSet) {
@@ -91,18 +91,18 @@ const ChoreModal = ({
   }, [formData.start_date, mode, hasEndDateBeenSet]);
 
   if (!isOpen) return null;
-  if (mode === 'view' && !chore) return null;
+  if (mode === 'view' && !task) return null;
 
   const handleToggle = async () => {
     try {
       setError(null);
       setIsLoading(true);
-      await onToggleComplete(chore.id, selectedInstance?.id);
+      await onToggleComplete(task.id, selectedInstance?.id);
       setIsComplete(!isComplete);
       onClose();
     } catch (error) {
-      console.error('Failed to toggle chore:', error);
-      setError(error.message || 'Failed to update chore status');
+      console.error('Failed to toggle task:', error);
+      setError(error.message || 'Failed to update task status');
     } finally {
       setIsLoading(false);
     }
@@ -123,8 +123,8 @@ const ChoreModal = ({
       await onSave(formData);
       onClose();
     } catch (error) {
-      console.error('Failed to save chore:', error);
-      setError(error.message || 'Failed to save chore');
+      console.error('Failed to save task:', error);
+      setError(error.message || 'Failed to save task');
     } finally {
       setIsLoading(false);
     }
@@ -145,7 +145,7 @@ const ChoreModal = ({
     setError(null);
     setHasEndDateBeenSet(false);
     if (mode === 'create') {
-      setFormData(defaultChore);
+      setFormData(defaultTask);
     }
     onClose();
   };
@@ -282,7 +282,7 @@ const ChoreModal = ({
               disabled={isLoading}
               className="px-4 py-2 bg-red-800/60 text-red-300 rounded-md hover:bg-red-800/80 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Delete Chore
+              Delete Task
             </button>
           )}
           <button
@@ -324,7 +324,7 @@ const ChoreModal = ({
     <form onSubmit={handleSubmit}>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold text-white">
-          Create New Chore
+          Create New Task
         </h2>
       </div>
 
@@ -482,7 +482,7 @@ const ChoreModal = ({
               <span>Creating...</span>
             </span>
           ) : (
-            'Create Chore'
+            'Create Task'
           )}
         </button>
       </div>
@@ -504,10 +504,10 @@ const ChoreModal = ({
   );
 };
 
-ChoreModal.propTypes = {
+TaskModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  chore: PropTypes.shape({
+  task: PropTypes.shape({
     id: PropTypes.number.isRequired,
     name: PropTypes.string.isRequired,
     frequency_id: PropTypes.number.isRequired,
@@ -526,7 +526,7 @@ ChoreModal.propTypes = {
   mode: PropTypes.oneOf(['view', 'create']),
   selectedInstance: PropTypes.shape({
     id: PropTypes.number.isRequired,
-    chore_id: PropTypes.number.isRequired,
+    task_id: PropTypes.number.isRequired,
     due_date: PropTypes.string.isRequired,
     is_complete: PropTypes.bool.isRequired,
     completed_at: PropTypes.string,
@@ -546,4 +546,4 @@ ChoreModal.propTypes = {
   }).isRequired
 };
 
-export default ChoreModal;
+export default TaskModal;

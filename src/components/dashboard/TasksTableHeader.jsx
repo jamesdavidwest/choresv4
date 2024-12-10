@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 
-const ChoresTableHeader = ({ onSort, sortConfig }) => {
+const TasksTableHeader = ({ onSort, sortConfig }) => {
   return (
     <tr className="bg-slate-800 text-slate-300">
       <th className="p-3 cursor-pointer" onClick={() => onSort('is_complete')}>
@@ -21,7 +21,7 @@ const ChoresTableHeader = ({ onSort, sortConfig }) => {
   );
 };
 
-ChoresTableHeader.propTypes = {
+TasksTableHeader.propTypes = {
   onSort: PropTypes.func.isRequired,
   sortConfig: PropTypes.shape({
     key: PropTypes.string.isRequired,
@@ -29,4 +29,4 @@ ChoresTableHeader.propTypes = {
   }).isRequired
 };
 
-export default ChoresTableHeader;
+export default TasksTableHeader;
