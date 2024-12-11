@@ -556,5 +556,4 @@ export const calendar = {
 	},
 };
 
-// Make sure both the class and its exports are available
 export { ApiError };
