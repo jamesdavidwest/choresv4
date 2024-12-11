@@ -64,12 +64,12 @@ const Toolbar = () => {
                   <Calendar className="h-5 w-5 text-gray-600 dark:text-dark-300" />
                 </Link>
 
-                {/* Chores Link - Only visible to admin */}
+                {/* Tasks Link - Only visible to admin */}
                 {user.role === 'ADMIN' && (
                   <Link 
-                    to="/chores" 
+                    to="/tasks" 
                     className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-full transition-colors duration-200"
-                    title="Manage Chores"
+                    title="Manage Tasks"
                   >
                     <ClipboardList className="h-5 w-5 text-gray-600 dark:text-dark-300" />
                   </Link>

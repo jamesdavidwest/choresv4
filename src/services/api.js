@@ -28,14 +28,39 @@ const fetchWithTimeout = (resource, options = {}) => {
 	}).finally(() => clearTimeout(id));
 };
 
+// Helper function to check if we're in the middle of auth initialization
+const isAuthInitializing = () => {
+	// Check if we're in the auth loading state by looking for the loading indicator
+	const loadingIndicator = document.querySelector(".auth-loading-indicator");
+	return !!loadingIndicator;
+};
+
 const fetchWithAuth = async (endpoint, options = {}, functionName = "") => {
-	try {
-		const token = localStorage.getItem("token");
-		if (!token && endpoint !== "/auth/login") {
-			console.error("No token found for authenticated request");
-			throw new ApiError("Authentication required", 401, null, functionName);
+	// Skip auth check for login endpoint
+	if (endpoint !== "/auth/login") {
+		// Check if we're still initializing auth
+		if (isAuthInitializing()) {
+			console.log(`Delaying ${functionName} request - auth is still initializing`);
+			// Wait for a short period and check again
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			if (isAuthInitializing()) {
+				throw new ApiError("Authentication is still initializing", 401, null, functionName);
+			}
 		}
 
+		// Check for token before making the request
+		const token = localStorage.getItem("token");
+		if (!token) {
+			console.error("No token found for authenticated request");
+			// Clear any stale data
+			localStorage.removeItem("user");
+			window.location.href = "/signin";
+			throw new ApiError("Authentication required", 401, null, functionName);
+		}
+	}
+
+	try {
+		const token = localStorage.getItem("token");
 		const headers = {
 			"Content-Type": "application/json",
 			...(token && { Authorization: `Bearer ${token}` }),
@@ -62,7 +87,9 @@ const fetchWithAuth = async (endpoint, options = {}, functionName = "") => {
 		});
 
 		if (response.status === 401) {
+			// Clear any stale data
 			localStorage.removeItem("token");
+			localStorage.removeItem("user");
 			window.location.href = "/signin";
 			throw new ApiError("Session expired. Please login again.", 401, null, functionName);
 		}
@@ -279,7 +306,6 @@ export const tasks = {
 		}
 	},
 
-	// New method for bulk updates
 	updateBatch: async (updates) => {
 		if (!Array.isArray(updates) || updates.length === 0) {
 			throw new ApiError("Updates array is required", 400, null, "tasks.updateBatch");
@@ -311,17 +337,26 @@ export const tasks = {
 
 export const auth = {
 	login: async (credentials) => {
-		if (!credentials.username || !credentials.password) {
-			throw new ApiError("Username and password are required", 400, null, "auth.login");
+		if (!credentials.username && !credentials.email) {
+			throw new ApiError("Username or email is required", 400, null, "auth.login");
+		}
+		if (!credentials.password) {
+			throw new ApiError("Password is required", 400, null, "auth.login");
 		}
 
 		try {
+			// Convert username to expected email format if needed
+			const loginData = {
+				email: credentials.email || credentials.username,
+				password: credentials.password,
+			};
+
 			const response = await fetch(`${API_URL}/auth/login`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(credentials),
+				body: JSON.stringify(loginData),
 			});
 
 			if (!response.ok) {
@@ -338,6 +373,7 @@ export const auth = {
 				throw new ApiError("No token received from server", 500, null, "auth.login");
 			}
 		} catch (error) {
+			console.error("Login error details:", error);
 			if (error instanceof ApiError) throw error;
 			throw new ApiError(error.message || "Login failed", 500, null, "auth.login");
 		}
@@ -441,30 +477,81 @@ export const notifications = {
 
 export const calendar = {
 	getInstances: async (params = {}) => {
-		const queryParams = new URLSearchParams({
-			...params,
-			startDate: params.startDate ? new Date(params.startDate).toISOString().split("T")[0] : undefined,
-			endDate: params.endDate ? new Date(params.endDate).toISOString().split("T")[0] : undefined,
-		}).toString();
+		// Convert camelCase parameters to snake_case and validate
+		const validParams = {};
 
-		return fetchWithAuth(`/calendar/instances${queryParams ? `?${queryParams}` : ""}`, {}, "calendar.getInstances");
-	},
+		// Handle date parameters
+		if (params.startDate) {
+			const startDate = new Date(params.startDate);
+			if (isNaN(startDate.getTime())) {
+				throw new ApiError("Invalid start date", 400, null, "calendar.getInstances");
+			}
+			validParams.start_date = startDate.toISOString().split("T")[0];
+		}
 
-	generateInstances: async (taskId, startDate, endDate) => {
-		if (!taskId) throw new ApiError("Task ID is required", 400, null, "calendar.generateInstances");
-		if (!startDate || !endDate) throw new ApiError("Start and end dates are required", 400, null, "calendar.generateInstances");
+		if (params.endDate) {
+			const endDate = new Date(params.endDate);
+			if (isNaN(endDate.getTime())) {
+				throw new ApiError("Invalid end date", 400, null, "calendar.getInstances");
+			}
+			validParams.end_date = endDate.toISOString().split("T")[0];
+		}
+
+		// Handle ID parameters with proper parsing
+		if (params.userId !== undefined && params.userId !== null) {
+			const userId = parseInt(params.userId, 10);
+			if (!isNaN(userId)) {
+				validParams.user_id = userId;
+			}
+		}
+
+		if (params.categoryId !== undefined && params.categoryId !== null) {
+			const categoryId = parseInt(params.categoryId, 10);
+			if (!isNaN(categoryId)) {
+				validParams.category_id = categoryId;
+			}
+		}
+
+		if (params.locationId !== undefined && params.locationId !== null) {
+			const locationId = parseInt(params.locationId, 10);
+			if (!isNaN(locationId)) {
+				validParams.location_id = locationId;
+			}
+		}
+
+		// Handle status parameter
+		if (params.status) {
+			validParams.status = params.status;
+		}
+
+		// Create query string, filtering out undefined values
+		const queryString = new URLSearchParams(
+			Object.entries(validParams)
+				.filter(([, value]) => value !== undefined && value !== null)
+				.map(([key, value]) => [key, value.toString()])
+		).toString();
 
 		return fetchWithAuth(
-			"/calendar/generate",
+			`/calendar/events${queryString ? `?${queryString}` : ""}`,
+			{},
+			"calendar.getInstances"
+		);
+	},
+
+	moveEvent: async (instanceId, date, time) => {
+		if (!instanceId) throw new ApiError("Instance ID is required", 400, null, "calendar.moveEvent");
+		if (!date) throw new ApiError("Date is required", 400, null, "calendar.moveEvent");
+
+		return fetchWithAuth(
+			`/calendar/events/${instanceId}/move`,
 			{
-				method: "POST",
+				method: "PUT",
 				body: JSON.stringify({
-					taskId,
-					startDate: new Date(startDate).toISOString().split("T")[0],
-					endDate: new Date(endDate).toISOString().split("T")[0],
+					due_date: new Date(date).toISOString().split("T")[0],
+					due_time: time || "09:00:00",
 				}),
 			},
-			"calendar.generateInstances"
+			"calendar.moveEvent"
 		);
 	},
 };

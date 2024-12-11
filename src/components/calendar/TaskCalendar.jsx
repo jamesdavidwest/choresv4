@@ -28,7 +28,7 @@ const USER_OPTIONS = [
 ];
 
 const TaskCalendar = () => {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [selectedInstance, setSelectedInstance] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,13 +83,18 @@ const TaskCalendar = () => {
     }, []);
 
     const handleDatesSet = useCallback(async (dateInfo) => {
+        // Don't fetch if auth is still loading
+        if (authLoading) {
+            return;
+        }
+
         try {
             const { start, end } = getExtendedDateRange(dateInfo.startStr, dateInfo.endStr);
             await refetchEvents(start, end, selectedUserId === 0 ? null : selectedUserId);
         } catch (err) {
             console.error('Error in handleDatesSet:', err);
         }
-    }, [refetchEvents, selectedUserId, getExtendedDateRange]);
+    }, [refetchEvents, selectedUserId, getExtendedDateRange, authLoading]);
 
     const handleCloseModal = useCallback(() => {
         setIsModalOpen(false);
@@ -198,6 +203,17 @@ const TaskCalendar = () => {
     ), []);
 
     if (error) return <div className="text-red-500">Error: {error.message}</div>;
+
+    // Show loading state while auth is initializing
+    if (authLoading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <div className="text-white bg-gray-800 rounded-lg p-4 shadow-lg">
+                    Loading...
+                </div>
+            </div>
+        );
+    }
 
     const canSelectUser = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 

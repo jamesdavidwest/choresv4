@@ -3,8 +3,8 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const SignIn = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@local');
+  const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
   const { login, isAuthenticated } = useAuth();
 
@@ -18,9 +18,23 @@ const SignIn = () => {
     setError('');
     
     try {
-      await login({ username, password });
-      // No need for navigate here as AuthContext handles the redirect
+      if (!email.trim()) {
+        throw new Error('Email is required');
+      }
+      if (!password.trim()) {
+        throw new Error('Password is required');
+      }
+
+      // For development, log the attempt
+      console.log('Attempting login with:', { email });
+      
+      await login({ 
+        email: email.trim(),
+        password: password.trim()
+      });
+      // AuthContext handles the redirect
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.message || 'Failed to sign in');
     }
   };
@@ -40,14 +54,14 @@ const SignIn = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-dark-100">
-              Username
+            <label htmlFor="email" className="block text-sm font-medium text-dark-100">
+              Email
             </label>
             <input
-              id="username"
+              id="email"
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="mt-1 block w-full px-3 py-2 bg-dark-700 border border-dark-600 text-dark-100 rounded-md shadow-dark-subtle focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               required
             />
@@ -74,6 +88,12 @@ const SignIn = () => {
             Sign In
           </button>
         </form>
+
+        <div className="mt-4 text-sm text-dark-300">
+          <p>Default credentials:</p>
+          <p>Email: admin@local</p>
+          <p>Password: password</p>
+        </div>
       </div>
     </div>
   );

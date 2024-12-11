@@ -4,11 +4,13 @@ import { tasks, calendar } from '../services/api';
 import { transformTasksToEvents, determineInstanceStatus } from '../utils/calendarUtils';
 import { STATUS_COLORS } from '../constants/taskConstants';
 import { isValid, parseISO, differenceInDays } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 
 const INSTANCE_BATCH_SIZE = 50;
 const PREFETCH_THRESHOLD = 7;
 
 export const useTasks = () => {
+    const { loading: authLoading } = useAuth();
     const [loading, setLoading] = useState(false);
     const [instanceLoading, setInstanceLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -90,8 +92,107 @@ export const useTasks = () => {
         return batchedEvents;
     }, []);
 
+    const refetchEvents = useCallback(async (startStr, endStr, userId, options = {}) => {
+        // Don't fetch if auth is still loading
+        if (authLoading) {
+            console.log('Skipping event fetch - auth is still loading');
+            return;
+        }
+
+        // Don't fetch if there's no token
+        if (!localStorage.getItem('token')) {
+            console.log('Skipping event fetch - no auth token found');
+            return;
+        }
+
+        setError(null);
+        
+        try {
+            const { start, end } = validateDateRange(startStr, endStr);
+            setDateRange({ start, end });
+
+            if (prefetchedRange.start && prefetchedRange.end) {
+                const prefetchStart = parseISO(prefetchedRange.start);
+                const prefetchEnd = parseISO(prefetchedRange.end);
+                
+                if (start >= prefetchStart && end <= prefetchEnd) {
+                    return; // Data already available
+                }
+            }
+
+            setLoading(true);
+
+            // Prepare API parameters with backend-expected names
+            const params = {
+                startDate: startStr,
+                endDate: endStr,
+                user_id: userId,
+                category_id: options.categoryId,
+                location_id: options.locationId,
+                status: options.status
+            };
+
+            // Fetch instances using the calendar API
+            const instances = await calendar.getInstances(params);
+            
+            // Transform instances to calendar events
+            const transformedEvents = transformTasksToEvents(instances);
+            
+            // Process instances in batches
+            const processedEvents = await processInstanceBatch(
+                transformedEvents,
+                events
+            );
+            
+            setEvents(processedEvents);
+            setPrefetchedRange({ start: startStr, end: endStr });
+
+            // Handle prefetching
+            if (shouldPrefetch(endStr, prefetchedRange.end)) {
+                const prefetchEnd = new Date(parseISO(endStr).getTime() + 30 * 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .split('T')[0];
+
+                const prefetchParams = {
+                    startDate: endStr,
+                    endDate: prefetchEnd,
+                    user_id: userId,
+                    category_id: options.categoryId,
+                    location_id: options.locationId,
+                    status: options.status
+                };
+
+                calendar.getInstances(prefetchParams)
+                    .then(prefetchData => {
+                        const prefetchedEvents = transformTasksToEvents(prefetchData);
+                        setEvents(prev => [...prev, ...prefetchedEvents]);
+                    })
+                    .catch(console.error);
+            }
+        } catch (err) {
+            const errorMessage = err.message || 'Failed to fetch tasks';
+            console.error('Error fetching tasks:', err);
+            setError(errorMessage);
+            setEvents([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [validateDateRange, processInstanceBatch, events, prefetchedRange, shouldPrefetch, authLoading]);
+
     // Update instance status
     const updateInstanceStatus = useCallback(async (taskId, instanceId) => {
+        // Don't update if auth is still loading
+        if (authLoading) {
+            console.log('Skipping instance update - auth is still loading');
+            return;
+        }
+
+        // Don't update if there's no token
+        if (!localStorage.getItem('token')) {
+            console.log('Skipping instance update - no auth token found');
+            return;
+        }
+
         try {
             setInstanceLoading(true);
             setError(null);
@@ -133,69 +234,7 @@ export const useTasks = () => {
         } finally {
             setInstanceLoading(false);
         }
-    }, []);
-
-    const refetchEvents = useCallback(async (startStr, endStr, userId) => {
-        setError(null);
-        
-        try {
-            const { start, end } = validateDateRange(startStr, endStr);
-            setDateRange({ start, end });
-
-            if (prefetchedRange.start && prefetchedRange.end) {
-                const prefetchStart = parseISO(prefetchedRange.start);
-                const prefetchEnd = parseISO(prefetchedRange.end);
-                
-                if (start >= prefetchStart && end <= prefetchEnd) {
-                    return; // Data already available
-                }
-            }
-
-            setLoading(true);
-
-            // Use the calendar API to get instances for the date range
-            const instances = await calendar.getInstances({
-                startDate: startStr,
-                endDate: endStr,
-                userId: userId
-            });
-            
-            // Transform instances to calendar events
-            const transformedEvents = transformTasksToEvents(instances);
-            
-            // Process instances in batches
-            const processedEvents = await processInstanceBatch(
-                transformedEvents,
-                events
-            );
-            
-            setEvents(processedEvents);
-            setPrefetchedRange({ start: startStr, end: endStr });
-
-            // Check if we need to prefetch more data
-            if (shouldPrefetch(endStr, prefetchedRange.end)) {
-                const prefetchEnd = new Date(parseISO(endStr).getTime() + 30 * 24 * 60 * 60 * 1000)
-                    .toISOString()
-                    .split('T')[0];
-
-                calendar.getInstances({
-                    startDate: endStr,
-                    endDate: prefetchEnd,
-                    userId: userId
-                }).then(prefetchData => {
-                    const prefetchedEvents = transformTasksToEvents(prefetchData);
-                    setEvents(prev => [...prev, ...prefetchedEvents]);
-                }).catch(console.error);
-            }
-        } catch (err) {
-            const errorMessage = err.message || 'Failed to fetch tasks';
-            console.error('Error fetching tasks:', err);
-            setError(errorMessage);
-            setEvents([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [validateDateRange, processInstanceBatch, events, prefetchedRange, shouldPrefetch]);
+    }, [authLoading]);
 
     // Get instance status
     const getInstanceStatus = useCallback((instanceId) => {

@@ -9,7 +9,7 @@ const SignIn = () => {
   const { login } = useAuth();
   
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -35,7 +35,7 @@ const SignIn = () => {
       // Navigation is handled in AuthContext after successful login
     } catch (err) {
       console.error('Login error:', err);
-      setError(err.message || 'Invalid username or password');
+      setError(err.message || 'Invalid email or password');
     } finally {
       setIsLoading(false);
     }
@@ -61,21 +61,21 @@ const SignIn = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div className="mb-4">
-              <label htmlFor="username" className="sr-only">
-                Username
+              <label htmlFor="email" className="sr-only">
+                Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   required
                   className="appearance-none rounded-md relative block w-full px-10 py-2 border border-gray-700 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Username"
-                  value={formData.username}
+                  placeholder="Email address"
+                  value={formData.email}
                   onChange={handleChange}
                   disabled={isLoading}
                 />
